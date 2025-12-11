@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+
+
+# Videos and Photos
+results/
+uploads/
+*.mp4
+*.jpg
+*.png

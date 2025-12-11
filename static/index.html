@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Object Counting UI</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <h1>Upload Image or Video</h1>
+
+    <form id="uploadForm">
+        <label>Select file:</label>
+        <input type="file" name="file" id="fileInput" required><br><br>
+
+        <label>Model:</label>
+        <input type="text" name="model" value="yolo11n.pt"><br><br>
+
+        <label>Confidence Threshold:</label>
+        <input type="number" name="conf_threshold" value="0.35" step="0.01" min="0" max="1"><br><br>
+
+        <label>Processing Type:</label>
+        <select name="type" id="typeSelect">
+            <option value="basic">Basic Image</option>
+            <option value="sliced">Sliced Image</option>
+            <option value="video">Video</option>
+            <option value="sliced_video">Sliced Video</option>
+        </select><br><br>
+
+        <!-- Sliced Image Settings (hidden by default) -->
+        <div id="slicedImageSettings" style="display:none;">
+            <h3>Sliced Image Settings</h3>
+
+            <label>Slice Width:</label>
+            <input type="number" name="img_slice_width" id="imgSliceWidth" value="256" min="64" max="2048" step="32">
+            <br><br>
+
+            <label>Slice Height:</label>
+            <input type="number" name="img_slice_height" id="imgSliceHeight" value="256" min="64" max="2048" step="32">
+            <br><br>
+
+            <label>Overlap Width Ratio (0.0-1.0):</label>
+            <input type="number" name="img_overlap_width_ratio" id="imgOverlapWidthRatio" value="0.2" min="0" max="1"
+                step="0.05">
+            <br><br>
+
+            <label>Overlap Height Ratio (0.0-1.0):</label>
+            <input type="number" name="img_overlap_height_ratio" id="imgOverlapHeightRatio" value="0.2" min="0" max="1"
+                step="0.05">
+            <br><br>
+        </div>
+
+        <!-- Sliced Video Settings (hidden by default) -->
+        <div id="slicedVideoSettings" style="display:none;">
+            <h3>Sliced Video Settings</h3>
+
+            <label>Slice Width:</label>
+            <input type="number" name="slice_width" id="sliceWidth" value="960" min="64" max="2048" step="32">
+            <br><br>
+
+            <label>Slice Height:</label>
+            <input type="number" name="slice_height" id="sliceHeight" value="960" min="64" max="2048" step="32">
+            <br><br>
+
+            <label>Overlap Width (pixels):</label>
+            <input type="number" name="overlap_width" id="overlapWidth" value="10" min="0" max="200" step="5">
+            <br><br>
+
+            <label>Overlap Height (pixels):</label>
+            <input type="number" name="overlap_height" id="overlapHeight" value="10" min="0" max="200" step="5">
+            <br><br>
+        </div>
+
+        <button type="submit">Upload & Process</button>
+    </form>
+
+    <h2>Results</h2>
+    <pre id="results"></pre>
+    <img id="annotatedImage" style="max-width:500px; display:none;">
+    <video id="annotatedVideo" controls style="max-width:500px; display:none;"></video>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
