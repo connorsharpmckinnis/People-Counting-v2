@@ -1,0 +1,12 @@
+.venv/
+uploads/
+results/
+__pycache__/
+*.mp4
+*.png
+*.jpg
+*.jpeg
+*.pt
+*.pth
+*.onnx
+.DS_Store

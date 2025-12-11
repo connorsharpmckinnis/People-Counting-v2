@@ -1,15 +1,15 @@
 import os
 import uuid
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import File, UploadFile, Form, APIRouter
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from typing import Optional
 from pathlib import Path
 
 # Import your existing counting functions
-from main import basic_count, sliced_count, video_count, sliced_video_count
+from functions import basic_count, sliced_count, video_count, sliced_video_count
 
-app = FastAPI(title="Municipal Object Counting API")
+router = APIRouter()
 
 # Folder to store uploaded files and results
 UPLOAD_DIR = Path("uploads")
@@ -24,7 +24,7 @@ def save_upload_file(upload_file: UploadFile, dest: Path) -> Path:
     return dest
 
 
-@app.post("/basic-count")
+@router.post("/basic-count")
 async def api_basic_count(
     file: UploadFile = File(...),
     model: Optional[str] = Form("yolo11n.pt"),
@@ -43,7 +43,7 @@ async def api_basic_count(
     return JSONResponse({"counts": counts, "annotated_file": f"/results/{annotated_file.name}"})
 
 
-@app.post("/sliced-count")
+@router.post("/sliced-count")
 async def api_sliced_count(
     file: UploadFile = File(...),
     model: Optional[str] = Form("yolo11n.pt"),
@@ -75,7 +75,7 @@ async def api_sliced_count(
     return JSONResponse({"counts": counts, "annotated_file": f"/results/{annotated_file.name}"})
 
 
-@app.post("/video-count")
+@router.post("/video-count")
 async def api_video_count(
     file: UploadFile = File(...),
     model: Optional[str] = Form("yolo11n.pt"),
@@ -102,7 +102,7 @@ async def api_video_count(
     return JSONResponse({"counts": counts, "annotated_file": f"/results/{annotated_file.name}"})
 
 
-@app.post("/sliced-video-count")
+@router.post("/sliced-video-count")
 async def api_sliced_video_count(
     file: UploadFile = File(...),
     model: Optional[str] = Form("yolo11n.pt"),
@@ -132,7 +132,7 @@ async def api_sliced_video_count(
     return JSONResponse({"counts": counts, "annotated_file": f"/results/{annotated_file.name}"})
 
 
-@app.get("/get-result/{filename}")
+@router.get("/get-result/{filename}")
 async def get_result_file(filename: str):
     """Serve result files directly with proper headers"""
     file_path = RESULTS_DIR / filename
@@ -144,10 +144,3 @@ async def get_result_file(filename: str):
         media_type="video/mp4" if filename.endswith(".mp4") else "image/png",
         filename=filename
     )
-
-
-
-# Serve the results folder as static files
-# IMPORTANT: These mounts must come AFTER all API endpoints to avoid route conflicts
-app.mount("/results", StaticFiles(directory=str(RESULTS_DIR)), name="results")
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
