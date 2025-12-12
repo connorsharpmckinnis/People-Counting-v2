@@ -73,12 +73,14 @@ form.addEventListener("submit", async (e) => {
     const data = await response.json();
     resultsEl.textContent = JSON.stringify(data.counts, null, 2);
 
-    if (data.annotated_file.endsWith(".png") || data.annotated_file.endsWith(".jpg")) {
+    if (data.file_type === "image") {
         imgEl.src = data.annotated_file;
         imgEl.style.display = "block";
-    } else if (data.annotated_file.endsWith(".mp4")) {
+        videoEl.style.display = "none";
+    } else if (data.file_type === "video") {
         videoEl.src = data.annotated_file;
-        videoEl.load(); // Force the video to reload
+        videoEl.load();
         videoEl.style.display = "block";
+        imgEl.style.display = "none";
     }
 });

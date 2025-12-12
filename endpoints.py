@@ -1,6 +1,6 @@
 import os
 import uuid
-from fastapi import File, UploadFile, Form, APIRouter
+from fastapi import File, UploadFile, Form, APIRouter, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from typing import Optional
@@ -10,6 +10,8 @@ from pathlib import Path
 from functions import basic_count, sliced_count, video_count, sliced_video_count
 
 router = APIRouter()
+
+TOKENS = {}
 
 # Folder to store uploaded files and results
 UPLOAD_DIR = Path("uploads")
@@ -30,17 +32,29 @@ async def api_basic_count(
     model: Optional[str] = Form("yolo11n.pt"),
     conf_threshold: Optional[float] = Form(0.35)
 ):
+
+    token = uuid.uuid4().hex
+
     file_id = str(uuid.uuid4())
-    filename = UPLOAD_DIR / f"{file_id}_{file.filename}"
+    ext = Path(file.filename).suffix  # ".jpg" or ".png" or ".mp4"
+    filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
     counts, annotated_path = basic_count(str(filename), config={"model": model, "conf_threshold": conf_threshold})
 
     # Move annotated image to RESULTS_DIR
-    annotated_file = RESULTS_DIR / Path(annotated_path).name
+    annotated_file = RESULTS_DIR / f"{token}{ext}"
     os.replace(annotated_path, annotated_file)
 
-    return JSONResponse({"counts": counts, "annotated_file": f"/results/{annotated_file.name}"})
+    TOKENS[token] = annotated_file
+
+    print("RESPONSE DEBUG:", {
+        "counts": counts,
+        "url": f"/secure-results/{token}{ext}",
+        "file_type": "image"
+    })
+
+    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "image"})
 
 
 @router.post("/sliced-count")
@@ -53,8 +67,12 @@ async def api_sliced_count(
     overlap_width_ratio: Optional[float] = Form(0.2),
     overlap_height_ratio: Optional[float] = Form(0.2)
 ):
+
+    token = uuid.uuid4().hex
+
     file_id = str(uuid.uuid4())
-    filename = UPLOAD_DIR / f"{file_id}_{file.filename}"
+    ext = Path(file.filename).suffix  # ".jpg" or ".png" or ".mp4"
+    filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
     # Build config with slice parameters
@@ -69,10 +87,12 @@ async def api_sliced_count(
 
     counts, annotated_path = sliced_count(str(filename), config=config)
 
-    annotated_file = RESULTS_DIR / Path(annotated_path).name
+    annotated_file = RESULTS_DIR / f"{token}{ext}"
     os.replace(annotated_path, annotated_file)
 
-    return JSONResponse({"counts": counts, "annotated_file": f"/results/{annotated_file.name}"})
+    TOKENS[token] = annotated_file
+
+    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "image"})
 
 
 @router.post("/video-count")
@@ -81,13 +101,17 @@ async def api_video_count(
     model: Optional[str] = Form("yolo11n.pt"),
     conf_threshold: Optional[float] = Form(0.35)
 ):
+
+    token = uuid.uuid4().hex
+
     file_id = str(uuid.uuid4())
-    filename = UPLOAD_DIR / f"{file_id}_{file.filename}"
+    ext = Path(file.filename).suffix  # ".jpg" or ".png" or ".mp4"
+    filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
     counts, annotated_path = video_count(str(filename), config={"model": model, "conf_threshold": conf_threshold})
 
-    annotated_file = RESULTS_DIR / Path(annotated_path).name
+    annotated_file = RESULTS_DIR / f"{token}{ext}"
     
     # Check if the source file exists before moving
     if not os.path.exists(annotated_path):
@@ -99,8 +123,9 @@ async def api_video_count(
     if not annotated_file.exists():
         return JSONResponse({"error": f"Failed to move annotated file to results directory"}, status_code=500)
 
-    return JSONResponse({"counts": counts, "annotated_file": f"/results/{annotated_file.name}"})
+    TOKENS[token] = annotated_file
 
+    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "video"})
 
 @router.post("/sliced-video-count")
 async def api_sliced_video_count(
@@ -112,8 +137,12 @@ async def api_sliced_video_count(
     overlap_width: Optional[int] = Form(10),
     overlap_height: Optional[int] = Form(10)
 ):
+
+    token = uuid.uuid4().hex
+
     file_id = str(uuid.uuid4())
-    filename = UPLOAD_DIR / f"{file_id}_{file.filename}"
+    ext = Path(file.filename).suffix  # ".jpg" or ".png" or ".mp4"
+    filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
     # Build config with slice parameters
@@ -126,12 +155,20 @@ async def api_sliced_video_count(
 
     counts, annotated_path = sliced_video_count(str(filename), config=config)
 
-    annotated_file = RESULTS_DIR / Path(annotated_path).name
+    annotated_file = RESULTS_DIR / f"{token}{ext}"
     os.replace(annotated_path, annotated_file)
 
-    return JSONResponse({"counts": counts, "annotated_file": f"/results/{annotated_file.name}"})
+    TOKENS[token] = annotated_file
 
+    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "video"})
 
+@router.get("/secure-results/{filename}")
+async def secure_image(filename: str):
+    file_path = RESULTS_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(file_path)
+    
 @router.get("/get-result/{filename}")
 async def get_result_file(filename: str):
     """Serve result files directly with proper headers"""

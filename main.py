@@ -15,5 +15,5 @@ app.add_middleware(
 
 app.include_router(router)
 
-app.mount("/results", StaticFiles(directory="results"), name="results")
+#app.mount("/results", StaticFiles(directory="results"), name="results")
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

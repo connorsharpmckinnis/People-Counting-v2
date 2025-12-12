@@ -21,7 +21,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the project
-COPY . .
+COPY main.py endpoints.py functions.py /app/
+COPY static /app/static
 
 # Create folders in case they don’t already exist
 RUN mkdir -p /app/uploads /app/results

@@ -1,6 +1,7 @@
 .venv/
 uploads/
 results/
+uploads/
 __pycache__/
 *.mp4
 *.png
