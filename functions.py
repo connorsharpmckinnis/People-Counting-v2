@@ -14,6 +14,7 @@ import subprocess
 import time
 from pathlib import Path
 from typing import TypedDict, Optional, List
+import torch
 
 
 class Config(TypedDict):
@@ -106,11 +107,13 @@ def sliced_count(image_path: str, config: dict):
     overlap_height_ratio = config.get("overlap_height_ratio", 0.2)
     overlap_width_ratio = config.get("overlap_width_ratio", 0.2)
 
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
     detection_model = AutoDetectionModel.from_pretrained(
         model_type="ultralytics",
         model_path=model,
         confidence_threshold=conf_threshold,
-        device="cpu",
+        device=device,
     )
 
     result = get_sliced_prediction(
