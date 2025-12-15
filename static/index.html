@@ -1,84 +1,194 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <title>Object Counting UI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detection Engine</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <h1>Upload Image or Video</h1>
+    <div class="container">
+        <header>
+            <h1>Detection Engine</h1>
+            <p class="subtitle">Provided by the Town of Apex</p>
+        </header>
 
-    <form id="uploadForm">
-        <label>Select file:</label>
-        <input type="file" name="file" id="fileInput" required><br><br>
-
-        <label>Model:</label>
-        <input type="text" name="model" value="yolo11n.pt"><br><br>
-
-        <label>Confidence Threshold:</label>
-        <input type="number" name="conf_threshold" value="0.35" step="0.01" min="0" max="1"><br><br>
-
-        <label>Processing Type:</label>
-        <select name="type" id="typeSelect">
-            <option value="basic">Basic Image</option>
-            <option value="sliced">Sliced Image</option>
-            <option value="video">Video</option>
-            <option value="sliced_video">Sliced Video</option>
-        </select><br><br>
-
-        <!-- Sliced Image Settings (hidden by default) -->
-        <div id="slicedImageSettings" style="display:none;">
-            <h3>Sliced Image Settings</h3>
-
-            <label>Slice Width:</label>
-            <input type="number" name="img_slice_width" id="imgSliceWidth" value="256" min="64" max="2048" step="32">
-            <br><br>
-
-            <label>Slice Height:</label>
-            <input type="number" name="img_slice_height" id="imgSliceHeight" value="256" min="64" max="2048" step="32">
-            <br><br>
-
-            <label>Overlap Width Ratio (0.0-1.0):</label>
-            <input type="number" name="img_overlap_width_ratio" id="imgOverlapWidthRatio" value="0.2" min="0" max="1"
-                step="0.05">
-            <br><br>
-
-            <label>Overlap Height Ratio (0.0-1.0):</label>
-            <input type="number" name="img_overlap_height_ratio" id="imgOverlapHeightRatio" value="0.2" min="0" max="1"
-                step="0.05">
-            <br><br>
+        <!-- Info Section -->
+        <div class="info-card">
+            <h2>Quick Guide</h2>
+            <div class="guide-grid">
+                <div class="guide-item">
+                    <strong>Basic Image/Video</strong>
+                    <p>Standard detection - fast and efficient for many use cases</p>
+                </div>
+                <div class="guide-item">
+                    <strong>Sliced Image/Video</strong>
+                    <p>Better for small objects, crowds, or aerial footage</p>
+                </div>
+            </div>
         </div>
 
-        <!-- Sliced Video Settings (hidden by default) -->
-        <div id="slicedVideoSettings" style="display:none;">
-            <h3>Sliced Video Settings</h3>
+        <!-- Main Form -->
+        <form id="uploadForm" class="upload-form">
+            <h2>Configuration</h2>
 
-            <label>Slice Width:</label>
-            <input type="number" name="slice_width" id="sliceWidth" value="960" min="64" max="2048" step="32">
-            <br><br>
+            <!-- File Upload -->
+            <div class="form-group">
+                <label for="fileInput">
+                    Select File
+                    <span class="tooltip"
+                        data-tooltip="Choose an image (.jpg, .png) or video (.mp4) to process">ℹ️</span>
+                </label>
+                <input type="file" name="file" id="fileInput" accept="image/*,video/*" required>
+            </div>
 
-            <label>Slice Height:</label>
-            <input type="number" name="slice_height" id="sliceHeight" value="960" min="64" max="2048" step="32">
-            <br><br>
+            <!-- Processing Type -->
+            <div class="form-group">
+                <label for="typeSelect">
+                    Processing Type
+                    <span class="tooltip"
+                        data-tooltip="Basic: Fast standard detection. Sliced: Better for small objects, uses tiled processing.">ℹ️</span>
+                </label>
+                <select name="type" id="typeSelect">
+                    <option value="basic">Basic Image</option>
+                    <option value="sliced">Sliced Image (Better for small objects)</option>
+                    <option value="video">Basic Video</option>
+                    <option value="sliced_video">Sliced Video (Better for small objects)</option>
+                </select>
+            </div>
 
-            <label>Overlap Width (pixels):</label>
-            <input type="number" name="overlap_width" id="overlapWidth" value="10" min="0" max="200" step="5">
-            <br><br>
+            <!-- Model -->
+            <div class="form-group">
+                <label for="modelInput">
+                    Model
+                    <span class="tooltip"
+                        data-tooltip="yolo11n.pt = fastest, yolo11x.pt = most accurate. Default is a good balance.">ℹ️</span>
+                </label>
+                <input type="text" name="model" id="modelInput" value="yolo11n.pt">
+            </div>
 
-            <label>Overlap Height (pixels):</label>
-            <input type="number" name="overlap_height" id="overlapHeight" value="10" min="0" max="200" step="5">
-            <br><br>
+            <!-- Confidence Threshold -->
+            <div class="form-group">
+                <label for="confInput">
+                    Confidence Threshold
+                    <span class="tooltip"
+                        data-tooltip="Lower (0.1-0.3) = more detections but more false positives. Higher (0.5-0.8) = fewer but more confident detections.">ℹ️</span>
+                </label>
+                <input type="number" name="conf_threshold" id="confInput" value="0.35" step="0.01" min="0" max="1">
+                <span class="input-hint">Current: <span id="confValue">0.35</span></span>
+            </div>
+
+            <!-- Sliced Image Settings -->
+            <div id="slicedImageSettings" class="advanced-settings" style="display:none;">
+                <h3>Slicer Settings</h3>
+                <p class="settings-description">Image is divided into overlapping tiles for better small object
+                    detection</p>
+
+                <div class="form-group">
+                    <label for="imgSliceWidth">
+                        Slice Width (pixels)
+                        <span class="tooltip"
+                            data-tooltip="Smaller slices (128-256) = better for tiny objects but slower. Larger (512-1024) = faster but may miss small details.">ℹ️</span>
+                    </label>
+                    <input type="number" name="img_slice_width" id="imgSliceWidth" value="256" min="64" max="2048"
+                        step="32">
+                </div>
+
+                <div class="form-group">
+                    <label for="imgSliceHeight">
+                        Slice Height (pixels)
+                        <span class="tooltip"
+                            data-tooltip="Should typically match slice width for square tiles.">ℹ️</span>
+                    </label>
+                    <input type="number" name="img_slice_height" id="imgSliceHeight" value="256" min="64" max="2048"
+                        step="32">
+                </div>
+
+                <div class="form-group">
+                    <label for="imgOverlapWidthRatio">
+                        Overlap Width Ratio
+                        <span class="tooltip"
+                            data-tooltip="How much tiles overlap (0.0-1.0). Higher overlap (0.2-0.3) catches objects at tile edges but is slower.">ℹ️</span>
+                    </label>
+                    <input type="number" name="img_overlap_width_ratio" id="imgOverlapWidthRatio" value="0.2" min="0"
+                        max="1" step="0.05">
+                </div>
+
+                <div class="form-group">
+                    <label for="imgOverlapHeightRatio">
+                        Overlap Height Ratio
+                        <span class="tooltip" data-tooltip="Should typically match overlap width ratio.">ℹ️</span>
+                    </label>
+                    <input type="number" name="img_overlap_height_ratio" id="imgOverlapHeightRatio" value="0.2" min="0"
+                        max="1" step="0.05">
+                </div>
+            </div>
+
+            <!-- Sliced Video Settings -->
+            <div id="slicedVideoSettings" class="advanced-settings" style="display:none;">
+                <h3>Slicer Settings</h3>
+                <p class="settings-description">Each frame is divided into overlapping tiles with object tracking across
+                    frames</p>
+
+                <div class="form-group">
+                    <label for="sliceWidth">
+                        Slice Width (pixels)
+                        <span class="tooltip"
+                            data-tooltip="Larger slices (960+) recommended for video to balance speed and accuracy.">ℹ️</span>
+                    </label>
+                    <input type="number" name="slice_width" id="sliceWidth" value="960" min="64" max="2048" step="32">
+                </div>
+
+                <div class="form-group">
+                    <label for="sliceHeight">
+                        Slice Height (pixels)
+                        <span class="tooltip" data-tooltip="Should typically match slice width.">ℹ️</span>
+                    </label>
+                    <input type="number" name="slice_height" id="sliceHeight" value="960" min="64" max="2048" step="32">
+                </div>
+
+                <div class="form-group">
+                    <label for="overlapWidth">
+                        Overlap Width (pixels)
+                        <span class="tooltip"
+                            data-tooltip="Pixel overlap between tiles. 10-20px is usually sufficient for video.">ℹ️</span>
+                    </label>
+                    <input type="number" name="overlap_width" id="overlapWidth" value="10" min="0" max="200" step="5">
+                </div>
+
+                <div class="form-group">
+                    <label for="overlapHeight">
+                        Overlap Height (pixels)
+                        <span class="tooltip" data-tooltip="Should typically match overlap width.">ℹ️</span>
+                    </label>
+                    <input type="number" name="overlap_height" id="overlapHeight" value="10" min="0" max="200" step="5">
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn">
+                <span id="btnText">🚀 Upload & Process</span>
+                <span id="btnLoader" class="loader" style="display:none;"></span>
+            </button>
+        </form>
+
+        <!-- Results Section -->
+        <div class="results-section" id="resultsSection" style="display:none;">
+            <h2>Results</h2>
+            <div class="results-grid">
+                <div class="results-card">
+                    <h3>Object Counts</h3>
+                    <pre id="results"></pre>
+                </div>
+                <div class="results-card">
+                    <h3>Annotated Output</h3>
+                    <img id="annotatedImage" style="display:none;">
+                    <video id="annotatedVideo" controls style="display:none;"></video>
+                </div>
+            </div>
         </div>
-
-        <button type="submit">Upload & Process</button>
-    </form>
-
-    <h2>Results</h2>
-    <pre id="results"></pre>
-    <img id="annotatedImage" style="max-width:500px; display:none;">
-    <video id="annotatedVideo" controls style="max-width:500px; display:none;"></video>
+    </div>
 
     <script src="script.js"></script>
 </body>

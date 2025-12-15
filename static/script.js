@@ -5,6 +5,16 @@ const videoEl = document.getElementById("annotatedVideo");
 const typeSelect = document.getElementById("typeSelect");
 const slicedImageSettings = document.getElementById("slicedImageSettings");
 const slicedVideoSettings = document.getElementById("slicedVideoSettings");
+const resultsSection = document.getElementById("resultsSection");
+const confInput = document.getElementById("confInput");
+const confValue = document.getElementById("confValue");
+const btnText = document.getElementById("btnText");
+const btnLoader = document.getElementById("btnLoader");
+
+// Update confidence value display in real-time
+confInput.addEventListener("input", () => {
+    confValue.textContent = confInput.value;
+});
 
 // Show/hide settings based on processing type
 typeSelect.addEventListener("change", () => {
@@ -26,6 +36,11 @@ form.addEventListener("submit", async (e) => {
     const fileInput = document.getElementById("fileInput");
     const model = form.model.value;
     const conf = form.conf_threshold.value;
+
+    // Show loading state
+    btnText.style.display = "none";
+    btnLoader.style.display = "inline-block";
+    form.querySelector(".submit-btn").disabled = true;
 
     const formData = new FormData();
     formData.append("file", fileInput.files[0]);
@@ -56,31 +71,52 @@ form.addEventListener("submit", async (e) => {
         case "sliced_video": endpoint = "/sliced-video-count"; break;
     }
 
-    resultsEl.textContent = "Processing...";
+    resultsEl.textContent = "Processing your file...";
     imgEl.style.display = "none";
     videoEl.style.display = "none";
+    resultsSection.style.display = "block";
 
-    const response = await fetch(endpoint, {
-        method: "POST",
-        body: formData
-    });
+    try {
+        const response = await fetch(endpoint, {
+            method: "POST",
+            body: formData
+        });
 
-    if (!response.ok) {
-        resultsEl.textContent = `Error: ${response.status} ${response.statusText}`;
-        return;
-    }
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
 
-    const data = await response.json();
-    resultsEl.textContent = JSON.stringify(data.counts, null, 2);
+        const data = await response.json();
 
-    if (data.file_type === "image") {
-        imgEl.src = data.annotated_file;
-        imgEl.style.display = "block";
-        videoEl.style.display = "none";
-    } else if (data.file_type === "video") {
-        videoEl.src = data.annotated_file;
-        videoEl.load();
-        videoEl.style.display = "block";
-        imgEl.style.display = "none";
+        // Format the counts nicely
+        if (Object.keys(data.counts).length === 0) {
+            resultsEl.textContent = "No objects detected";
+        } else {
+            resultsEl.textContent = JSON.stringify(data.counts, null, 2);
+        }
+
+        // Show the appropriate media
+        if (data.file_type === "image") {
+            imgEl.src = data.annotated_file;
+            imgEl.style.display = "block";
+            videoEl.style.display = "none";
+        } else if (data.file_type === "video") {
+            videoEl.src = data.annotated_file;
+            videoEl.load();
+            videoEl.style.display = "block";
+            imgEl.style.display = "none";
+        }
+
+        // Scroll to results
+        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    } catch (error) {
+        resultsEl.textContent = `❌ Error: ${error.message}\n\nPlease check:\n- File format is supported\n- Server is running\n- File size is reasonable`;
+        resultsEl.style.color = "#d63031";
+    } finally {
+        // Reset button state
+        btnText.style.display = "inline";
+        btnLoader.style.display = "none";
+        form.querySelector(".submit-btn").disabled = false;
     }
 });

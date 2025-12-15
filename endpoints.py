@@ -36,7 +36,7 @@ async def api_basic_count(
     token = uuid.uuid4().hex
 
     file_id = str(uuid.uuid4())
-    ext = Path(file.filename).suffix  # ".jpg" or ".png" or ".mp4"
+    ext = Path(file.filename).suffix.lower()  # ".jpg" or ".png" or ".mp4" (normalized to lowercase)
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
@@ -71,7 +71,7 @@ async def api_sliced_count(
     token = uuid.uuid4().hex
 
     file_id = str(uuid.uuid4())
-    ext = Path(file.filename).suffix  # ".jpg" or ".png" or ".mp4"
+    ext = Path(file.filename).suffix.lower()  # ".jpg" or ".png" or ".mp4" (normalized to lowercase)
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
@@ -105,7 +105,7 @@ async def api_video_count(
     token = uuid.uuid4().hex
 
     file_id = str(uuid.uuid4())
-    ext = Path(file.filename).suffix  # ".jpg" or ".png" or ".mp4"
+    ext = Path(file.filename).suffix.lower()  # ".jpg" or ".png" or ".mp4" (normalized to lowercase)
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
@@ -141,7 +141,7 @@ async def api_sliced_video_count(
     token = uuid.uuid4().hex
 
     file_id = str(uuid.uuid4())
-    ext = Path(file.filename).suffix  # ".jpg" or ".png" or ".mp4"
+    ext = Path(file.filename).suffix.lower()  # ".jpg" or ".png" or ".mp4" (normalized to lowercase)
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
