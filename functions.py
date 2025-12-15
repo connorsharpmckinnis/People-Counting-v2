@@ -2,7 +2,7 @@
 from sahi import AutoDetectionModel
 from sahi.predict import get_prediction, get_sliced_prediction, predict
 from collections import Counter
-from ultralytics import YOLO
+from ultralytics import YOLO, solutions
 from ultralytics.trackers.byte_tracker import BYTETracker
 from collections import defaultdict
 import cv2
@@ -315,3 +315,77 @@ def sliced_video_count(
     final_counts = {cls: len(ids) for cls, ids in unique_ids.items()}
     return final_counts, final_path
 
+def video_polygon_cross_count(video_file: str, config: dict):
+    """
+    Count objects in a video file using the ObjectCounter class from the ultralytics library.
+    Still in progress, not ready yet
+    """
+    cap = cv2.VideoCapture(video_file)
+    assert cap.isOpened(), "Error reading video file"
+
+    # region_points = [(20, 400), (1080, 400)]                                      # line counting
+    region_points = [(286, 226), (252, 1154)]  # rectangular region
+
+    # Initialize object counter object
+    counter = solutions.ObjectCounter(
+        show=True,  # display the output
+        region=region_points,  # pass region points
+        model="yolo11n.pt",  # model="yolo11n-obb.pt" for object counting with OBB model.
+        classes=[2],  # count specific classes, e.g., person and car with the COCO pretrained model.
+        tracker="bytetrack.yaml",  # choose trackers, e.g., "bytetrack.yaml"
+    )
+
+    # Process video
+    while cap.isOpened():
+        success, im0 = cap.read()
+
+        if not success:
+            print("Video frame is empty or processing is complete.")
+            break
+
+        results = counter(im0)
+
+        # print(results)  # access the output
+
+
+    cap.release()
+    cv2.destroyAllWindows()  # destroy all opened windows
+
+    return results.total_tracks
+
+def image_zone_count(image_file: str, config: dict):
+    """
+    Count objects in an image file using the ObjectCounter class from the ultralytics library.
+    Still in progress, not ready yet
+    """
+    image = cv2.imread(image_file)
+
+    # Pass region as dictionary
+    region_points = {
+        "region-01": [(50, 50), (250, 50), (250, 250), (50, 250)],
+        "region-02": [(640, 640), (780, 640), (780, 720), (640, 720)],
+    }
+
+    # Initialize region counter object
+    regioncounter = solutions.RegionCounter(
+        show=True,  # display the frame
+        region=region_points,  # pass region points
+        model="yolo11n.pt",  # model for counting in regions, e.g., yolo11s.pt
+    )
+
+    # Process video
+    results: solutions.RegionCounterResult = regioncounter.process(image)
+
+    print(results.total_tracks)
+    # print(results)  # access the output
+    cv2.imshow("Image", results.plot_im)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    return results
+
+def test():
+    image_zone_count("test_image.png", {})
+
+
+if __name__ == "__main__":
+    test()
