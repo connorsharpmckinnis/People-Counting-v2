@@ -56,6 +56,7 @@
                     <option value="sliced">Sliced Image (Better for small objects)</option>
                     <option value="video">Basic Video</option>
                     <option value="sliced_video">Sliced Video (Better for small objects)</option>
+                    <option value="polygon_cross_count">Polygon Crossing (Video)</option>
                 </select>
             </div>
 
@@ -78,6 +79,24 @@
                 </label>
                 <input type="number" name="conf_threshold" id="confInput" value="0.35" step="0.01" min="0" max="1">
                 <span class="input-hint">Current: <span id="confValue">0.35</span></span>
+            </div>
+
+            <!-- Classes to Detect -->
+            <div class="form-group">
+                <label for="polygonClasses">
+                    Classes to Detect (Optional)
+                    <span class="tooltip"
+                        data-tooltip="Comma-separated COCO class IDs. Example: 0=person, 2=car, 7=truck. Leave blank to detect all classes.">
+                        ℹ️
+                    </span>
+                </label>
+
+                <input type="text" id="polygonClasses" name="polygon_classes" placeholder="e.g. 0, 2, 7"
+                    style="width: 100%;" />
+
+                <small style="display: block; margin-top: 5px; color: #666;">
+                    Enter comma-separated integers (COCO class IDs). Example: <code>0,2</code> counts people and cars.
+                </small>
             </div>
 
             <!-- Sliced Image Settings -->
@@ -167,11 +186,47 @@
                 </div>
             </div>
 
+            <!-- Polygon Cross Count Video Settings -->
+            <div id="polygonCrossCountSettings" class="advanced-settings" style="display:none;">
+                <h3>Polygon Cross Count Settings</h3>
+                <p class="settings-description">Define a polygonal region to count objects crossing it</p>
+
+                <div class="form-group">
+                    <label>Draw Region on Frame</label>
+                    <div class="canvas-container"
+                        style="position: relative; width: 100%; max-width: 800px; margin-bottom: 10px;">
+                        <canvas id="regionCanvas"
+                            style="width: 100%; border: 1px solid #ccc; display: none; cursor: crosshair;"></canvas>
+                        <div id="canvasPlaceholder"
+                            style="padding: 20px; text-align: center; background: #f0f0f0; border-radius: 6px; color: #666;">
+                            Select a video to verify frame dimensions and draw markings
+                        </div>
+                    </div>
+                    <button type="button" id="clearPointsBtn"
+                        style="padding: 5px 10px; font-size: 0.8rem; background: #636e72; color: white; border: none; border-radius: 4px; cursor: pointer;">Clear
+                        Points</button>
+                    <small style="display: block; margin-top: 5px; color: #666;">Points: <span
+                            id="pointCount">0</span></small>
+                </div>
+
+                <div class="form-group">
+                    <label for="regionPoints">
+                        Region Points (Line or Polygon)
+                        <span class="tooltip"
+                            data-tooltip="Format: [(x1,y1), (x2,y2)] or [(x1,y1), ..., (x4,y4)]. Default is a vertical line.">ℹ️</span>
+                    </label>
+                    <input type="text" name="region_points" id="regionPoints" placeholder="[(300, 100), (300, 1200)]"
+                        readonly style="background: #f9f9f9; cursor: not-allowed;">
+                </div>
+            </div>
+
             <button type="submit" class="submit-btn">
                 <span id="btnText">🚀 Upload & Process</span>
                 <span id="btnLoader" class="loader" style="display:none;"></span>
             </button>
         </form>
+
+
 
         <!-- Results Section -->
         <div class="results-section" id="resultsSection" style="display:none;">

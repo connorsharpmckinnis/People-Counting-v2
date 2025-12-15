@@ -18,3 +18,7 @@ uploads/
 *.png
 *.mov
 *.avi
+
+
+# Large models
+yolo11x.pt

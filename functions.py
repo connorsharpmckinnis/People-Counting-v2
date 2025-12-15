@@ -12,7 +12,37 @@ import os
 import shutil
 import subprocess
 import time
+from pathlib import Path
+from typing import TypedDict, Optional, List
 
+
+class Config(TypedDict):
+    model: str
+    """Path to model weights"""
+    classes: Optional[List[str]]
+    """List of classes to track"""
+    tracker: Optional[str]
+    """Tracker to use"""
+    conf_threshold: float
+    """Confidence threshold for object detection"""
+    slice_wh: Optional[tuple]
+    """Slice width and height"""
+    overlap_wh: Optional[tuple]
+    """Overlap width and height"""
+    slice_height: Optional[int]
+    """Slice height"""
+    slice_width: Optional[int]
+    """Slice width"""
+    overlap_height_ratio: Optional[float]
+    """Overlap height ratio"""
+    overlap_width_ratio: Optional[float]
+    """Overlap width ratio"""
+    region_points: Optional[List[tuple]]
+    """Region points"""
+    output_path: Optional[str]
+    """Output path"""
+    input_path: Optional[str]
+    """Input path"""
 
 def convert_to_h264(input_path: str, output_path: str) -> bool:
     """Convert video to H.264 format for browser compatibility using ffmpeg"""
@@ -42,7 +72,7 @@ def basic_count(image_path: str, config: dict):
     model = YOLO(model_path)
 
     # Perform inference
-    results = model(image_path, conf=conf_threshold)
+    results = model(image_path, conf=conf_threshold, classes=config.get("classes"))
 
     # Convert YOLO results → Supervision Detections
     detections = sv.Detections.from_ultralytics(results[0])
@@ -95,6 +125,17 @@ def sliced_count(image_path: str, config: dict):
     base, ext = os.path.splitext(image_path)
     output_folder = f"{base}_annotated"      # folder SAHI will create
     final_path = f"{base}_annotated{ext}"    # final annotated image path
+
+    # Filter by class if specified
+    classes_to_track = config.get("classes")
+    if classes_to_track is not None:
+        # result.object_prediction_list contains ObjectPrediction items
+        # checking against category.id (int)
+        filtered_list = []
+        for pred in result.object_prediction_list:
+            if pred.category.id in classes_to_track:
+                filtered_list.append(pred)
+        result.object_prediction_list = filtered_list
 
     # export visuals to folder
     result.export_visuals(output_folder, text_size=int(1))
@@ -152,7 +193,8 @@ def video_count(video_path: str, config: dict):
         source=video_path,
         tracker="bytetrack.yaml",
         stream=True,
-        conf=conf_threshold
+        conf=conf_threshold,
+        classes=config.get("classes")
     )
 
     seen_ids = {}
@@ -227,7 +269,7 @@ def sliced_video_count(
     unique_ids = {}
 
     def slice_callback(image_slice: np.ndarray) -> sv.Detections:
-        results = model(image_slice, conf=conf_threshold)[0]
+        results = model(image_slice, conf=conf_threshold, classes=config.get("classes"))[0]
         detections = sv.Detections.from_ultralytics(results)
         return detections
 
@@ -317,41 +359,78 @@ def sliced_video_count(
 
 def video_polygon_cross_count(video_file: str, config: dict):
     """
-    Count objects in a video file using the ObjectCounter class from the ultralytics library.
-    Still in progress, not ready yet
+    Count objects crossing a line or polygon in a video and return:
+    - dict of crossing counts
+    - filepath to annotated video
     """
+    base, ext = os.path.splitext(video_file)
+    save_path = config.get("save_path", f"{base}_annotated.mp4")
+    
     cap = cv2.VideoCapture(video_file)
     assert cap.isOpened(), "Error reading video file"
 
-    # region_points = [(20, 400), (1080, 400)]                                      # line counting
-    region_points = [(286, 226), (252, 1154)]  # rectangular region
+    # Video properties
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
 
-    # Initialize object counter object
-    counter = solutions.ObjectCounter(
-        show=True,  # display the output
-        region=region_points,  # pass region points
-        model="yolo11n.pt",  # model="yolo11n-obb.pt" for object counting with OBB model.
-        classes=[2],  # count specific classes, e.g., person and car with the COCO pretrained model.
-        tracker="bytetrack.yaml",  # choose trackers, e.g., "bytetrack.yaml"
+    annotated_video_writer = cv2.VideoWriter(
+        save_path,
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        fps,
+        (w, h),
     )
 
-    # Process video
+    # Line counting (2 points = line), polygon counting (4 points = polygon) 
+    # Use config points or default to a vertical line in the middle
+    region_points = config.get("region_points")
+    if not region_points:
+        mid_x = w // 2
+        region_points = [(mid_x, 0), (mid_x, h)]
+
+    counter = solutions.ObjectCounter(
+        show=False,
+        region=region_points,
+        model=config.get("model", "yolo11n.pt"),
+        conf=config.get("conf_threshold", 0.5),
+        classes=config.get("classes"),
+        tracker=config.get("tracker", "bytetrack.yaml"),
+    )
+
     while cap.isOpened():
         success, im0 = cap.read()
-
         if not success:
-            print("Video frame is empty or processing is complete.")
             break
 
         results = counter(im0)
-
-        # print(results)  # access the output
-
+        annotated_video_writer.write(results.plot_im)
 
     cap.release()
-    cv2.destroyAllWindows()  # destroy all opened windows
+    annotated_video_writer.release()
+    cv2.destroyAllWindows()
+    
+    # Wait a bit for file to release
+    time.sleep(0.5)
 
-    return results.total_tracks
+    # --- Extract counts from the counter ---
+    cross_counts = getattr(counter, "classwise_count", {})
+
+    print(cross_counts)
+    
+    # Convert to H.264 for browser compatibility
+    base, ext = os.path.splitext(save_path)
+    h264_path = f"{base}_h264.mp4"
+    
+    if convert_to_h264(save_path, h264_path):
+        # Conversion successful, remove the mp4v version and use H.264
+        os.remove(save_path)
+        final_path = h264_path
+    else:
+        # Conversion failed, use the mp4v version (user can download it)
+        print("Warning: H.264 conversion failed, using mp4v format")
+        final_path = save_path
+
+    return cross_counts, final_path
 
 def image_zone_count(image_file: str, config: dict):
     """
@@ -384,7 +463,23 @@ def image_zone_count(image_file: str, config: dict):
     return results
 
 def test():
-    image_zone_count("test_image.png", {})
+
+    config = Config(
+        model="yolo11n.pt",
+        classes=[0],
+        tracker="bytetrack.yaml",
+        conf_threshold=0.5,
+        slice_wh=(960, 960),
+        overlap_wh=(10, 10),
+        slice_height=256,
+        slice_width=256,
+        overlap_height_ratio=0.2,
+        overlap_width_ratio=0.2,
+        region_points=[(300, 100), (300, 1200)],
+        output_path="test_video_annotated.mp4",
+        input_path="test_video.mov"
+    )
+    video_polygon_cross_count("test_video.mov", config)
 
 
 if __name__ == "__main__":
