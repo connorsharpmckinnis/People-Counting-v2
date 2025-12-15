@@ -57,6 +57,7 @@
                     <option value="video">Basic Video</option>
                     <option value="sliced_video">Sliced Video (Better for small objects)</option>
                     <option value="polygon_cross_count">Polygon Crossing (Video)</option>
+                    <option value="image_zone_count">Image Zone Counting</option>
                 </select>
             </div>
 
@@ -217,6 +218,41 @@
                     </label>
                     <input type="text" name="region_points" id="regionPoints" placeholder="[(300, 100), (300, 1200)]"
                         readonly style="background: #f9f9f9; cursor: not-allowed;">
+                </div>
+            </div>
+
+            <!-- Image Zone Counting Settings -->
+            <div id="imageZoneSettings" class="advanced-settings" style="display:none;">
+                <h3>Image Zone Settings</h3>
+                <p class="settings-description">Draw a polygon zone on the image to count objects within it.</p>
+
+                <div class="form-group">
+                    <label>Draw Zone on Image</label>
+                    <div class="canvas-container"
+                        style="position: relative; width: 100%; max-width: 800px; margin-bottom: 10px;">
+                        <canvas id="imgZoneCanvas"
+                            style="width: 100%; border: 1px solid #ccc; display: none; cursor: crosshair;"></canvas>
+                        <div id="imgZonePlaceholder"
+                            style="padding: 20px; text-align: center; background: #f0f0f0; border-radius: 6px; color: #666;">
+                            Select an image to draw zone
+                        </div>
+                    </div>
+                    <button type="button" id="imgZoneClearBtn"
+                        style="padding: 5px 10px; font-size: 0.8rem; background: #636e72; color: white; border: none; border-radius: 4px; cursor: pointer;">Clear
+                        Points</button>
+                    <small style="display: block; margin-top: 5px; color: #666;">Points: <span
+                            id="imgZonePointCount">0</span></small>
+                </div>
+
+                <div class="form-group">
+                    <label for="imgZonePoints">
+                        Zone Points
+                        <span class="tooltip"
+                            data-tooltip="Format: [(x1,y1), (x2,y2), ...]. Defines the polygon zone.">ℹ️</span>
+                    </label>
+                    <input type="text" name="img_zone_points" id="imgZonePoints"
+                        placeholder="[(50, 50), (250, 50), ...]" readonly
+                        style="background: #f9f9f9; cursor: not-allowed;">
                 </div>
             </div>
 

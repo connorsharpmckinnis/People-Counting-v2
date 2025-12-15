@@ -272,6 +272,57 @@ async def api_polygon_cross_count(
 
 
 
+@router.post("/image-zone-count")
+async def api_image_zone_count(
+    file: UploadFile = File(...),
+    model: Optional[str] = Form("yolo11n.pt"),
+    conf_threshold: Optional[float] = Form(0.35),
+    region_points: Optional[str] = Form("[(50, 50), (250, 50), (250, 250), (50, 250)]"),
+    classes: Optional[str] = Form(None)
+):
+    token = uuid.uuid4().hex
+
+    file_id = str(uuid.uuid4())
+    ext = Path(file.filename).suffix.lower()
+    filename = UPLOAD_DIR / f"{file_id}{ext}"
+    save_upload_file(file, filename)
+
+    # Parse region points string to list
+    try:
+        import ast
+        points = ast.literal_eval(region_points)
+        if not isinstance(points, (list, tuple)):
+            raise ValueError
+    except:
+        points = [(0, 0), (100, 0), (100, 100), (0, 100)]
+        print(f"Failed to parse region points: {region_points}, using default.")
+
+    # Parse classes
+    class_list = None
+    if classes:
+        try:
+            import json
+            class_list = json.loads(classes)
+        except:
+            print(f"Failed to parse classes: {classes}")
+
+    # Build config
+    config = {
+        "model": model,
+        "conf_threshold": conf_threshold,
+        "region_points": points,
+        "classes": class_list
+    }
+
+    counts, annotated_path = image_zone_count(str(filename), config=config)
+
+    annotated_file = RESULTS_DIR / f"{token}{ext}"
+    os.replace(annotated_path, annotated_file)
+
+    TOKENS[token] = annotated_file
+
+    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "image"})
+
 @router.get("/secure-results/{filename}")
 async def secure_image(filename: str):
     file_path = RESULTS_DIR / filename

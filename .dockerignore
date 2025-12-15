@@ -4,6 +4,9 @@ results/
 uploads/
 __pycache__/
 *.mp4
+*.mov
+*.webm
+*.avi
 *.png
 *.jpg
 *.jpeg

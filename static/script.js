@@ -12,6 +12,13 @@ const confValue = document.getElementById("confValue");
 const btnText = document.getElementById("btnText");
 const btnLoader = document.getElementById("btnLoader");
 
+const imageZoneSettings = document.getElementById("imageZoneSettings");
+const imgZoneCanvas = document.getElementById("imgZoneCanvas");
+const imgZonePlaceholder = document.getElementById("imgZonePlaceholder");
+const imgZonePointsInput = document.getElementById("imgZonePoints");
+const imgZoneClearBtn = document.getElementById("imgZoneClearBtn");
+const imgZonePointCountSpan = document.getElementById("imgZonePointCount");
+
 // Update confidence value display in real-time
 confInput.addEventListener("input", () => {
     confValue.textContent = confInput.value;
@@ -23,6 +30,7 @@ typeSelect.addEventListener("change", () => {
     slicedImageSettings.style.display = "none";
     slicedVideoSettings.style.display = "none";
     polygonCrossCountSettings.style.display = "none";
+    imageZoneSettings.style.display = "none";
 
     // Show appropriate settings
     if (typeSelect.value === "sliced") {
@@ -35,10 +43,15 @@ typeSelect.addEventListener("change", () => {
         if (fileInput.files.length > 0) {
             loadVideoFrame(fileInput.files[0]);
         }
+    } else if (typeSelect.value === "image_zone_count") {
+        imageZoneSettings.style.display = "block";
+        if (fileInput.files.length > 0) {
+            loadImageToCanvas(fileInput.files[0]);
+        }
     }
 });
 
-// Interactive Region Drawing Logic
+// --- VIDEO REGION DRAWING LOGIC ---
 const regionCanvas = document.getElementById("regionCanvas");
 const canvasPlaceholder = document.getElementById("canvasPlaceholder");
 const regionPointsInput = document.getElementById("regionPoints");
@@ -48,11 +61,26 @@ let currentPoints = [];
 let videoResolution = { width: 0, height: 0 };
 let currentFrameImage = null; // Store the frame for redrawing
 
+// --- IMAGE ZONE DRAWING LOGIC ---
+let imgZonePoints = [];
+let imgResolution = { width: 0, height: 0 };
+let currentImgImage = null;
+
 fileInput.addEventListener("change", (e) => {
-    if (e.target.files.length > 0 && e.target.files[0].type.startsWith("video/")) {
-        loadVideoFrame(e.target.files[0]);
+    const file = e.target.files[0];
+    if (!file) {
+        resetCanvas();
+        resetImgZoneCanvas();
+        return;
+    }
+
+    if (typeSelect.value === "polygon_cross_count" && file.type.startsWith("video/")) {
+        loadVideoFrame(file);
+    } else if (typeSelect.value === "image_zone_count" && file.type.startsWith("image/")) {
+        loadImageToCanvas(file);
     } else {
         resetCanvas();
+        resetImgZoneCanvas();
     }
 });
 
@@ -104,6 +132,35 @@ function loadVideoFrame(file) {
     };
 }
 
+function loadImageToCanvas(file) {
+    if (!file.type.startsWith("image/")) return;
+
+    const img = new Image();
+    img.onload = () => {
+        imgResolution.width = img.width;
+        imgResolution.height = img.height;
+        imgZoneCanvas.width = img.width;
+        imgZoneCanvas.height = img.height;
+
+        const ctx = imgZoneCanvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+
+        currentImgImage = ctx.getImageData(0, 0, imgZoneCanvas.width, imgZoneCanvas.height);
+
+        imgZoneCanvas.style.display = "block";
+        imgZonePlaceholder.style.display = "none";
+
+        imgZonePoints = [];
+        updateImgZonePoints();
+
+        URL.revokeObjectURL(img.src);
+    };
+    img.onerror = () => {
+        imgZonePlaceholder.textContent = "Error loading image.";
+    };
+    img.src = URL.createObjectURL(file);
+}
+
 function resetCanvas() {
     regionCanvas.style.display = "none";
     canvasPlaceholder.style.display = "block";
@@ -111,24 +168,37 @@ function resetCanvas() {
     updatePoints();
 }
 
+function resetImgZoneCanvas() {
+    imgZoneCanvas.style.display = "none";
+    imgZonePlaceholder.style.display = "block";
+    imgZonePoints = [];
+    updateImgZonePoints();
+}
+
+// Handler for Video Canvas
 regionCanvas.addEventListener("click", (e) => {
-    const rect = regionCanvas.getBoundingClientRect();
+    handleCanvasClick(e, regionCanvas, videoResolution, currentPoints, updatePoints, redrawCanvas);
+});
 
-    // Check if we have valid dimensions
-    if (rect.width === 0 || rect.height === 0 || videoResolution.width === 0) return;
+// Handler for Image Canvas
+imgZoneCanvas.addEventListener("click", (e) => {
+    handleCanvasClick(e, imgZoneCanvas, imgResolution, imgZonePoints, updateImgZonePoints, redrawImgZoneCanvas);
+});
 
-    // Calculate scaling factors (Displayed Size vs Actual Video Size)
-    const scaleX = videoResolution.width / rect.width;
-    const scaleY = videoResolution.height / rect.height;
+function handleCanvasClick(e, canvas, resolution, pointsArray, updateFn, redrawFn) {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0 || resolution.width === 0) return;
 
-    // Get click coordinates relative to the video resolution
+    const scaleX = resolution.width / rect.width;
+    const scaleY = resolution.height / rect.height;
+
     const x = Math.round((e.clientX - rect.left) * scaleX);
     const y = Math.round((e.clientY - rect.top) * scaleY);
 
-    currentPoints.push([x, y]);
-    updatePoints();
-    redrawCanvas();
-});
+    pointsArray.push([x, y]);
+    updateFn();
+    redrawFn();
+}
 
 clearPointsBtn.addEventListener("click", () => {
     currentPoints = [];
@@ -136,42 +206,55 @@ clearPointsBtn.addEventListener("click", () => {
     redrawCanvas();
 });
 
+imgZoneClearBtn.addEventListener("click", () => {
+    imgZonePoints = [];
+    updateImgZonePoints();
+    redrawImgZoneCanvas();
+});
+
 function updatePoints() {
     pointCountSpan.textContent = currentPoints.length;
+    regionPointsInput.value = "[" + currentPoints.map(p => `(${p[0]}, ${p[1]})`).join(", ") + "]";
+}
 
-    // Format as Python list of tuples: [(x, y), (x, y)]
-    const tupleString = "[" + currentPoints.map(p => `(${p[0]}, ${p[1]})`).join(", ") + "]";
-    regionPointsInput.value = tupleString;
+function updateImgZonePoints() {
+    imgZonePointCountSpan.textContent = imgZonePoints.length;
+    imgZonePointsInput.value = "[" + imgZonePoints.map(p => `(${p[0]}, ${p[1]})`).join(", ") + "]";
 }
 
 function redrawCanvas() {
-    if (!currentFrameImage) return;
+    drawOnCanvas(regionCanvas, currentFrameImage, currentPoints, videoResolution);
+}
 
-    const ctx = regionCanvas.getContext("2d");
+function redrawImgZoneCanvas() {
+    drawOnCanvas(imgZoneCanvas, currentImgImage, imgZonePoints, imgResolution);
+}
 
-    // Restore original frame
-    ctx.putImageData(currentFrameImage, 0, 0);
+function drawOnCanvas(canvas, bgImage, points, resolution) {
+    if (!bgImage) return;
+    const ctx = canvas.getContext("2d");
+    ctx.putImageData(bgImage, 0, 0);
 
-    if (currentPoints.length === 0) return;
+    if (points.length === 0) return;
 
-    const scaleLine = Math.max(2, videoResolution.width / 400);
-    const scaleRadius = Math.max(3, videoResolution.width / 200);
+    const scaleLine = Math.max(2, resolution.width / 400);
+    const scaleRadius = Math.max(3, resolution.width / 200);
 
     // 1. Draw Lines/Polygon
-    if (currentPoints.length > 1) {
+    if (points.length > 1) {
         ctx.beginPath();
         ctx.lineWidth = scaleLine;
         ctx.strokeStyle = "#00b894"; // success color
 
-        ctx.moveTo(currentPoints[0][0], currentPoints[0][1]);
+        ctx.moveTo(points[0][0], points[0][1]);
 
-        for (let i = 1; i < currentPoints.length; i++) {
-            ctx.lineTo(currentPoints[i][0], currentPoints[i][1]);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i][0], points[i][1]);
         }
 
         // Close polygon if > 2 points (draw line back to start)
-        if (currentPoints.length > 2) {
-            ctx.lineTo(currentPoints[0][0], currentPoints[0][1]);
+        if (points.length > 2) {
+            ctx.lineTo(points[0][0], points[0][1]);
             // Optional: fill polygon with transparent color
             ctx.fillStyle = "rgba(0, 184, 148, 0.2)";
             ctx.fill();
@@ -183,9 +266,9 @@ function redrawCanvas() {
     // 2. Draw Points (Vertices) on top
     ctx.fillStyle = "#ff7675"; // point color
 
-    for (let i = 0; i < currentPoints.length; i++) {
+    for (let i = 0; i < points.length; i++) {
         ctx.beginPath();
-        ctx.arc(currentPoints[i][0], currentPoints[i][1], scaleRadius, 0, Math.PI * 2);
+        ctx.arc(points[i][0], points[i][1], scaleRadius, 0, Math.PI * 2);
         ctx.fill();
     }
 }
@@ -243,6 +326,11 @@ form.addEventListener("submit", async (e) => {
         formData.append("region_points", form.region_points.value);
     }
 
+    // Add image zone count settings
+    if (typeSelect.value === "image_zone_count") {
+        formData.append("region_points", form.img_zone_points.value);
+    }
+
     let endpoint = "/basic-count";
     switch (typeSelect.value) {
         case "basic": endpoint = "/basic-count"; break;
@@ -250,6 +338,7 @@ form.addEventListener("submit", async (e) => {
         case "video": endpoint = "/video-count"; break;
         case "sliced_video": endpoint = "/sliced-video-count"; break;
         case "polygon_cross_count": endpoint = "/polygon-cross-count"; break;
+        case "image_zone_count": endpoint = "/image-zone-count"; break;
     }
 
     resultsEl.textContent = "Processing your file...";

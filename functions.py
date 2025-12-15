@@ -434,38 +434,46 @@ def video_polygon_cross_count(video_file: str, config: dict):
 
 def image_zone_count(image_file: str, config: dict):
     """
-    Count objects in an image file using the ObjectCounter class from the ultralytics library.
-    Still in progress, not ready yet
+    Count objects in a defined region of an image and save an annotated copy
+    using the same naming convention as basic_count.
     """
+
+    # --- Load image ---
     image = cv2.imread(image_file)
+    assert image is not None, "Could not read image file"
 
-    # Pass region as dictionary
-    region_points = {
-        "region-01": [(50, 50), (250, 50), (250, 250), (50, 250)],
-        "region-02": [(640, 640), (780, 640), (780, 720), (640, 720)],
-    }
+    # --- Output path: same convention as basic_count ---
+    base, ext = os.path.splitext(image_file)
+    out_path = f"{base}_annotated{ext}"
 
-    # Initialize region counter object
+    # --- Config ---
+    model = config.get("model", "yolo11n.pt")
+    conf = config.get("conf_threshold", 0.5)
+    classes = config.get("classes")
+    region_points = config.get("region_points")
+
+    # --- Initialize region counter ---
     regioncounter = solutions.RegionCounter(
-        show=True,  # display the frame
-        region=region_points,  # pass region points
-        model="yolo11n.pt",  # model for counting in regions, e.g., yolo11s.pt
+        show=False,
+        region=region_points,
+        model=model,
+        conf=conf,
+        classes=classes,
     )
 
-    # Process video
+    # --- Process image ---
     results: solutions.RegionCounterResult = regioncounter.process(image)
 
-    print(results.total_tracks)
-    # print(results)  # access the output
-    cv2.imshow("Image", results.plot_im)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    return results
+    # --- Save annotated image ---
+    cv2.imwrite(out_path, results.plot_im)
+
+    # --- Return counts + path ---
+    return results.region_counts, out_path
 
 def test():
 
     config = Config(
-        model="yolo11n.pt",
+        model="yolo11l.pt",
         classes=[0],
         tracker="bytetrack.yaml",
         conf_threshold=0.5,
@@ -475,11 +483,11 @@ def test():
         slice_width=256,
         overlap_height_ratio=0.2,
         overlap_width_ratio=0.2,
-        region_points=[(300, 100), (300, 1200)],
-        output_path="test_video_annotated.mp4",
-        input_path="test_video.mov"
+        region_points=[(100, 100), (100, 500), (500, 500), (500, 100)],
+        output_path="test_image_annotated.jpg",
+        input_path="parade.jpg"
     )
-    video_polygon_cross_count("test_video.mov", config)
+    image_zone_count("parade.jpg", config)
 
 
 if __name__ == "__main__":
