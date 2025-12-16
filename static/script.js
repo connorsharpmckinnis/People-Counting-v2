@@ -1,5 +1,6 @@
 const form = document.getElementById("uploadForm");
 const resultsEl = document.getElementById("results");
+
 const imgEl = document.getElementById("annotatedImage");
 const videoEl = document.getElementById("annotatedVideo");
 const typeSelect = document.getElementById("typeSelect");

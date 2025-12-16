@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Guide - Detection Engine</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔍</text></svg>">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>System User Guide</h1>
+            <p class="subtitle">Welcome to Detection Engine 101</p>
+            <div style="margin-top: 15px;">
+                <a href="/"
+                    style="display: inline-block; background-color: rgba(255,255,255,0.2); color: white; text-decoration: none; font-weight: 600; padding: 8px 16px; border-radius: 20px; font-size: 1.3rem; border: 1px solid rgba(255,255,255,0.4); transition: all 0.2s;">
+                    ← Back to Engine
+                </a>
+            </div>
+        </header>
+
+        <!-- Section 0: Disclaimers and Warnings -->
+        <div class="info-card">
+            <h2>Important Notes & Expectations</h2>
+            <p><strong>About Accuracy:</strong> This system provides best-effort detection results based on statistical
+                models. While it can be very useful, it isn’t perfect. Results should always be reviewed by a human and
+                used as guidance—not as absolute truth for critical decisions.</p>
+            <p><strong>System Status:</strong> The Detection Engine is provided “as-is.” Like any evolving technology,
+                it may contain bugs or edge cases that haven’t yet been identified. Please use it thoughtfully and
+                report issues when you encounter them.</p>
+            <p><strong>Ongoing Improvements:</strong> The interface and workflows are actively being refined. Some areas
+                may feel rough around the edges, but improvements are ongoing as I learn from real-world use.</p>
+            <p><strong>Using Results Responsibly:</strong> Detection outputs should be interpreted in context. When
+                results matter operationally, take time to validate findings and cross-check with other sources.</p>
+        </div>
+
+
+        <!-- Section 1: Choosing Mode -->
+        <div class="info-card">
+            <h2>Choosing the Right Processing Mode</h2>
+            <p style="margin-bottom: 20px;">The system offers several ways to process your files. Choosing the right one
+                is key to getting accurate results.</p>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                <thead>
+                    <tr style="background-color: #f1f2f6;">
+                        <th style="padding: 12px; border: 1px solid #dfe6e9; color: #2d3436; text-align: left;">Mode
+                        </th>
+                        <th style="padding: 12px; border: 1px solid #dfe6e9; color: #2d3436; text-align: left;">Best
+                            Used For...</th>
+                        <th style="padding: 12px; border: 1px solid #dfe6e9; color: #2d3436; text-align: left;">Pros &
+                            Cons</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;"><strong>Basic Image</strong></td>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;">General photos, street scenes, large
+                            objects.</td>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;">✅ Fastest<br>❌ Misses tiny objects</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;"><strong>Sliced Image (SAHI)</strong></td>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;">Aerial/Drone imagery, high-res maps,
+                            crowds.</td>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;">✅ Detects tiny objects accurately<br>❌
+                            4-10x slower than basic</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;"><strong>Basic Video</strong></td>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;">Surveillance, standard angles.</td>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;">✅ Smooth tracking<br>❌ struggles with very
+                            small objects</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;"><strong>Sliced Video</strong></td>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;">Drone video, high-altitude surveillance.
+                        </td>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;">✅ Maximum accuracy for small details<br>❌
+                            Very slow processing</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;"><strong>Polygon/Zone</strong></td>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;">Specific area counting (e.g., sidewalk
+                            only).</td>
+                        <td style="padding: 12px; border: 1px solid #dfe6e9;">✅ Ignores background clutter<br>❌ Requires
+                            manual setup</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Section 2: Model & Confidence -->
+        <div class="info-card">
+            <h2>Tuning the AI (Model & Confidence)</h2>
+
+            <div class="guide-grid" style="margin-top: 20px;">
+                <div class="guide-item">
+                    <strong>Choose Your Model</strong>
+                    <ul style="list-style: none; padding: 0; margin-top: 10px;">
+                        <li style="margin-bottom: 10px;"><strong>⚡ Nano (yolo11n.pt)</strong>Fastest. Good for
+                            distinct objects.</li>
+                        <li style="margin-bottom: 10px;"><strong>⚖️ Medium (yolo11m.pt)</strong>Balanced. Recommended
+                            default.</li>
+                        <li><strong>🧠 Extra Large (yolo11x.pt)</strong>Smartest. Use for difficult detections.</li>
+                    </ul>
+                </div>
+
+                <div class="guide-item">
+                    <strong>Confidence Threshold</strong>
+                    <p style="margin: 10px 0;">Controls detection detection sensitivity (0.0 - 1.0).</p>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin-bottom: 5px;"><strong>🎯 Default (0.35)</strong>Good balance.</li>
+                        <li style="margin-bottom: 5px;"><strong>📉 Lower (< 0.25)</strong>Catches more, but more false
+                                    positives.</li>
+                        <li><strong>📈 Higher (> 0.60)</strong>Fewer false positives, might miss real objects.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: Slicing -->
+        <div class="info-card">
+            <h2>Understanding Slicing (SAHI)</h2>
+            <p>For drone footage or 4K/8K images where objects are tiny dots. Slicing chops the image into tiles, zooms
+                in, finds objects, and stitches them back.</p>
+
+            <div
+                style="background: #f1f2f6; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid var(--primary-color);">
+                <h3 style="margin-bottom: 10px; color: #2d3436; font-size: 1.1rem;">Key Settings</h3>
+                <ul style="margin-left: 20px; color: var(--text-secondary);">
+                    <li style="margin-bottom: 8px;"><strong>Slice Width/Height</strong>: Keeping this small (e.g.,
+                        <code>256</code> or <code>512</code>) makes the AI "zoom in" more. Smaller = catch tinier
+                        objects, but slower processing.
+                    </li>
+                    <li><strong>Overlap Ratio</strong>: (e.g., <code>0.2</code>). Ensures objects on the edge of a tile
+                        aren't cut in half and missed.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Section 4: Expectations -->
+        <div class="info-card">
+            <h2>Performance Expectations</h2>
+            <p style="margin-bottom: 15px;">Timings vary based on hardware (GPU vs CPU), the model used, and the size of
+                the file being processed.</p>
+
+            <ul style="margin-left: 20px; margin-bottom: 20px;">
+                <li style="margin-bottom: 5px;"><strong>Images</strong>: 1-5 seconds. (Sliced: 10-30s)</li>
+                <li style="margin-bottom: 5px;"><strong>Standard Video</strong>: ~2-5 minutes per minute of video.
+                    Consider taking timelapses to cover more temporal ground.</li>
+                <li><strong>Sliced Video</strong>: <strong>Heavy computation.</strong> Can take 10x video duration.
+                    Remember, it's running dozens of smaller detection processes on every frame.</li>
+            </ul>
+
+            <div
+                style="background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; border: 1px solid #ffeeba;">
+                ⚠️ <strong>Note:</strong> The interface might look "stuck" on large video files. Check the server
+                console log if you have access!
+            </div>
+        </div>
+
+        <!-- Section 5: Troubleshooting -->
+        <div class="info-card">
+            <h2>Quick Troubleshooting</h2>
+            <ul style="margin-left: 20px;">
+                <li style="margin-bottom: 10px;"><strong>"Server Error" on Upload?</strong> Video might be too large for
+                    server memory. Try a shorter clip.</li>
+                <li style="margin-bottom: 10px;"><strong>Video won't play?</strong> We convert to H.264 automatically,
+                    but stick to <code>.mp4</code> or <code>.mov</code> inputs.</li>
+                <li><strong>Wrong Objects?</strong> Use "Classes to Detect". Enter <code>2</code> for cars,
+                    <code>0</code> for persons.
+                </li>
+            </ul>
+        </div>
+
+        <!-- Section 6: Common Classes -->
+        <div class="info-card">
+            <h2>Common Classes</h2>
+            <p style="margin-bottom: 15px;">Below are some common object classes and their corresponding IDs for
+                detection.</p>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                <thead>
+                    <tr style="background-color: #f2f2f2;">
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Name</th>
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Class ID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">person</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">0</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">bicycle</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">1</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">car</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">2</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">motorcycle</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">3</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">airplane</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">4</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">bus</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">5</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">train</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">6</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">truck</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">7</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">boat</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">8</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">traffic light</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">9</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">fire hydrant</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">10</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">stop sign</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">11</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">parking meter</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">12</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">bench</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">13</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</body>
+
+</html>

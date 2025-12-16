@@ -513,12 +513,71 @@ def image_zone_count(image_file: str, config: dict):
     # --- Return counts + path ---
     return results.region_counts, out_path
 
+def video_heatmap(video_file: str, config: dict):
+    model = config.get("model")
+    classes = config.get("classes")
+    conf = config.get("conf_threshold")
+    region_points = config.get("region_points")
+    
+    base, ext = os.path.splitext(video_file)
+    save_path = config.get("save_path", f"{base}_annotated.mp4")
+    
+    cap = cv2.VideoCapture(video_file)
+    assert cap.isOpened(), "Error reading video file"
+
+
+
+    # Video writer
+    w, h, fps = (int(cap.get(x)) for x in (cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT, cv2.CAP_PROP_FPS))
+    video_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+    # Initialize heatmap object
+    heatmap = solutions.Heatmap(
+        show=True,
+        model=model,
+        colormap=cv2.COLORMAP_PARULA,
+        conf=conf,
+        region=region_points,
+        classes=classes,
+    )
+
+    # Process video
+    while cap.isOpened():
+        success, im0 = cap.read()
+
+        if not success:
+            print("Video frame is empty or processing is complete.")
+            break
+
+        results = heatmap(im0)
+
+
+        video_writer.write(results.plot_im)  # write the processed frame.
+
+    # Convert to H.264 for browser compatibility
+    base, ext = os.path.splitext(save_path)
+    h264_path = f"{base}_h264.mp4"
+    
+    if convert_to_h264(save_path, h264_path):
+        # Conversion successful, remove the mp4v version and use H.264
+        os.remove(save_path)
+        final_path = h264_path
+    else:
+        # Conversion failed, use the mp4v version (user can download it)
+        print("Warning: H.264 conversion failed, using mp4v format")
+        final_path = save_path
+        
+    cap.release()
+    video_writer.release()
+    cv2.destroyAllWindows()  # destroy all opened windows
+
+    return results, final_path
+
 def test():
 
     config = Config(
         model="yolo11n.pt",
-        classes=[0],
-        tracker="bytetrack.yaml",
+        #classes=[0],
+        tracker="botsort.yaml",
         conf_threshold=0.5,
         slice_wh=(960, 960),
         overlap_wh=(10, 10),
@@ -526,11 +585,10 @@ def test():
         slice_width=256,
         overlap_height_ratio=0.2,
         overlap_width_ratio=0.2,
-        region_points=[(100, 100), (100, 500), (500, 500), (500, 100)],
-        output_path="test_image_annotated.jpg",
-        input_path="parade.jpg"
+        #region_points=[(100, 100), (100, 500), (500, 500), (500, 100)],
+
     )
-    counts, path = video_count("test_video.mov", config)
+    counts, path = video_heatmap("test_video.mov", config)
     print(counts)
     print(path)
 

@@ -50,6 +50,10 @@ app.mount(
 def home(_: None = Depends(check_password)):
     return FileResponse("static/index.html")
 
+@app.get("/guide")
+def guide(_: None = Depends(check_password)):
+    return FileResponse("static/guide.html")
+
 
 # API routes (protected)
 app.include_router(

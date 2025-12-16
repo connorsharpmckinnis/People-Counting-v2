@@ -12,6 +12,7 @@
     --success-color: #00b894;
     --warning-color: #fdcb6e;
     --danger-color: #d63031;
+    --danger-hover: #c0392b;
     --bg-color: #f5f6fa;
     --card-bg: #ffffff;
     --text-primary: #2d3436;
@@ -28,6 +29,7 @@
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     background: linear-gradient(135deg, #0f3680 0%, #0984e3 100%);
+    background-attachment: fixed;
     min-height: 100vh;
     padding: 2rem 1rem;
     color: var(--text-primary);
@@ -276,7 +278,45 @@ input[type="file"]::file-selector-button:hover {
     font-style: italic;
 }
 
-/* Submit Button */
+/* Reusable Button Classes */
+.btn {
+    display: inline-block;
+    padding: 0.7rem 1.4rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    color: white;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+}
+
+.btn-danger {
+    background-color: var(--danger-color);
+}
+
+.btn-danger:hover {
+    background-color: var(--danger-hover);
+}
+
 .submit-btn {
     width: 100%;
     padding: 1rem 2rem;
@@ -447,4 +487,9 @@ html {
 ::selection {
     background: var(--primary-color);
     color: white;
+}
+
+/* General Button (reset for standard buttons) */
+button {
+    cursor: pointer;
 }

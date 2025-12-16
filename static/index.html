@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detection Engine</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔍</text></svg>">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 
@@ -13,22 +15,13 @@
         <header>
             <h1>Detection Engine</h1>
             <p class="subtitle">Provided by the Town of Apex</p>
-        </header>
-
-        <!-- Info Section -->
-        <div class="info-card">
-            <h2>Quick Guide</h2>
-            <div class="guide-grid">
-                <div class="guide-item">
-                    <strong>Basic Image/Video</strong>
-                    <p>Standard detection - fast and efficient for many use cases</p>
-                </div>
-                <div class="guide-item">
-                    <strong>Sliced Image/Video</strong>
-                    <p>Better for small objects, crowds, or aerial footage</p>
-                </div>
+            <div style="margin-top: 15px;">
+                <a href="/guide"
+                    style="display: inline-block; background-color: white; color: #2d3436; text-decoration: none; font-weight: 600; padding: 8px 16px; border-radius: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-size: 1.3rem;">
+                    📚 How-To Guide
+                </a>
             </div>
-        </div>
+        </header>
 
         <!-- Main Form -->
         <form id="uploadForm" class="upload-form">
@@ -61,28 +54,32 @@
                 </select>
             </div>
 
-            <!-- Model -->
-            <div class="form-group">
-                <label for="modelSelect">
-                    Model
-                    <span class="tooltip" data-tooltip="Larger models are more accurate but slower. Nano is fastest.">
-                        ℹ️
-                    </span>
-                </label>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <!-- Model Select -->
+                <div class="form-group" style="flex: 1; min-width: 250px;">
+                    <label for="modelSelect">
+                        Model
+                        <span class="tooltip"
+                            data-tooltip="Larger models are more accurate but slower. Nano is fastest.">
+                            ℹ️
+                        </span>
+                    </label>
 
-                <select id="modelSelect" class="form-control">
-                    <option value="yolo11n.pt">Nano (Fastest)</option>
-                    <option value="yolo11s.pt">Small</option>
-                    <option value="yolo11m.pt">Medium</option>
-                    <option value="yolo11l.pt">Large</option>
-                    <option value="yolo11x.pt">Extra Large (Most Accurate)</option>
-                    <option value="yolo11n_drone.pt">People Only (Best with Aerial Crowds)</option>
-                </select>
-            </div>
+                    <select id="modelSelect" class="form-control">
+                        <option value="yolo11n.pt">Nano (Fastest)</option>
+                        <option value="yolo11s.pt">Small</option>
+                        <option value="yolo11m.pt">Medium</option>
+                        <option value="yolo11l.pt">Large</option>
+                        <option value="yolo11x.pt">Extra Large (Most Accurate)</option>
+                        <option value="yolo11n_drone.pt">People Only (Best with Aerial Crowds)</option>
+                    </select>
+                </div>
 
-            <div class="form-group">
-                <label for="modelInput">Model file</label>
-                <input type="text" name="model" id="modelInput" value="yolo11n.pt" class="form-control">
+                <!-- Model Input -->
+                <div class="form-group" style="flex: 1; min-width: 250px;">
+                    <label for="modelInput">Model file</label>
+                    <input type="text" name="model" id="modelInput" value="yolo11n.pt" class="form-control">
+                </div>
             </div>
 
             <!-- Confidence Threshold -->
@@ -93,7 +90,6 @@
                         data-tooltip="Lower (0.1-0.3) = more detections but more false positives. Higher (0.5-0.8) = fewer but more confident detections.">ℹ️</span>
                 </label>
                 <input type="number" name="conf_threshold" id="confInput" value="0.35" step="0.01" min="0" max="1">
-                <span class="input-hint">Current: <span id="confValue">0.35</span></span>
             </div>
 
             <!-- Classes to Detect -->
@@ -110,7 +106,7 @@
                     style="width: 100%;" />
 
                 <small style="display: block; margin-top: 5px; color: #666;">
-                    Enter comma-separated integers (COCO class IDs). Example: <code>0,2</code> counts people and cars.
+                    Enter comma-separated COCO class IDs. Example: <code>0,2</code> counts only people and cars.
                 </small>
             </div>
 
@@ -271,7 +267,7 @@
             </div>
 
             <button type="submit" class="submit-btn">
-                <span id="btnText">🚀 Upload & Process</span>
+                <span id="btnText">Upload & Process</span>
                 <span id="btnLoader" class="loader" style="display:none;"></span>
             </button>
         </form>
@@ -293,6 +289,34 @@
                 </div>
             </div>
         </div>
+
+        <!-- Bug Report Section -->
+        <div class="bug-report-section"
+            style="margin-top: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
+            <h2>Report a Bug</h2>
+            <p style="margin-bottom: 15px; color: #555;">Encountered an issue? Please click the button below to send me
+                a report. The more descriptive, the better.</p>
+            <a href="mailto:connor.mckinnis@apexnc.org?subject=Detection%20Engine%20Bug%20Report"
+                class="btn btn-danger">
+                Report Bug
+            </a>
+        </div>
+
+        <!-- About Section -->
+        <div class="about-section"
+            style="margin-top: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
+            <h2>About This System</h2>
+            <p style="margin-bottom: 15px; color: #555;">This system is being developed by Connor McKinnis with the Town
+                of Apex's IT Innovations division.</p>
+            <p style="margin-bottom: 15px; color: #555;">It is provided as-is for regional partners to access basic
+                computer vision tools without requiring in-house expertise.</p>
+            <a href="mailto:connor.mckinnis@apexnc.org?subject=Detection%20Engine" class="btn btn-primary"
+                style="margin-top: 15px;">
+                Contact Me
+            </a>
+        </div>
+
+
     </div>
 
     <script src="/static/script.js"></script>
