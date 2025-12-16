@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detection Engine</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
@@ -63,12 +63,26 @@
 
             <!-- Model -->
             <div class="form-group">
-                <label for="modelInput">
+                <label for="modelSelect">
                     Model
-                    <span class="tooltip"
-                        data-tooltip="yolo11n.pt = fastest, yolo11x.pt = most accurate. Default is a good balance.">ℹ️</span>
+                    <span class="tooltip" data-tooltip="Larger models are more accurate but slower. Nano is fastest.">
+                        ℹ️
+                    </span>
                 </label>
-                <input type="text" name="model" id="modelInput" value="yolo11n.pt">
+
+                <select id="modelSelect" class="form-control">
+                    <option value="yolo11n.pt">Nano (Fastest)</option>
+                    <option value="yolo11s.pt">Small</option>
+                    <option value="yolo11m.pt">Medium</option>
+                    <option value="yolo11l.pt">Large</option>
+                    <option value="yolo11x.pt">Extra Large (Most Accurate)</option>
+                    <option value="yolo11n_drone.pt">People Only (Best with Aerial Crowds)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="modelInput">Model file</label>
+                <input type="text" name="model" id="modelInput" value="yolo11n.pt" class="form-control">
             </div>
 
             <!-- Confidence Threshold -->
@@ -281,7 +295,7 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="/static/script.js"></script>
 </body>
 
 </html>

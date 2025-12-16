@@ -1,260 +1,156 @@
-# People Counting v2
+# Detection Engine v2
 
-A robust object detection and counting system built with YOLO11 and SAHI (Slicing Aided Hyper Inference). This tool provides both a web UI and API endpoints for processing images and videos to detect and count objects with tracking capabilities.
+A robust, secure object detection and counting system built with YOLO11, SAHI (Slicing Aided Hyper Inference), and FastAPI. This tool provides a modern web UI and secure API endpoints for detecting, tracking, and counting objects in images and videos.
 
-## Features
+**Latest Docker Image:** `connorsharpmckinnis/detection-engine:0.9`
 
-### Processing Modes
+## ✨ New Features in v2
 
-1. **Basic Image** - Standard YOLO inference on full images
-2. **Sliced Image** - SAHI-powered sliced inference for detecting small objects in large images
-3. **Video** - Frame-by-frame object detection with ByteTrack tracking
-4. **Sliced Video** - Combines sliced inference with video tracking for maximum accuracy
+- **🔐 Basic Authentication**: Secure access protected by an application password.
+- **🔳 Image Zone Counting**: Draw polygons on images to count objects only within specific zones.
+- **🚧 Video Line/Polygon Crossing**: Count objects crossing lines or entering defined zones in videos.
+- **🎯 Class Filtering**: Detect specific objects (e.g., only "person" or "car") by COCO class ID.
+- **🏎️ CUDA Support**: Automatic GPU acceleration if available.
+- **🚀 Dockerized**: Ready-to-deploy container.
 
-### Key Capabilities
+---
 
-- 🎯 **Object Detection & Counting** - Detect and count multiple object classes
-- 🎬 **Video Tracking** - Track unique objects across video frames using ByteTrack
-- 🔪 **Sliced Inference** - Process large images/videos in smaller tiles for better small object detection
-- 🌐 **Web Interface** - Clean, user-friendly web UI with dynamic settings
-- 🔌 **REST API** - FastAPI-based endpoints for programmatic access
-- 📹 **Browser-Compatible Video** - Automatic H.264 conversion for in-browser playback
-- ⚙️ **Configurable Parameters** - Adjust model, confidence threshold, and slicing parameters
+## 🚀 Quick Start (Docker)
 
-## Installation
+The easiest way to run the application is via Docker.
+
+1. **Create a `.env` file** with your desired password:
+   ```bash
+   APP_PASSWORD=my_secure_password
+   ```
+
+2. **Run the container**:
+   ```bash
+   docker run -d \
+     -p 8000:8000 \
+     --env-file .env \
+     connorsharpmckinnis/detection-engine:0.9
+   ```
+
+3. **Access the UI**:
+   - Open browser to `http://localhost:8000`
+   - Login with Username: (leave blank or use 'user') / Password: `my_secure_password`
+
+---
+
+## 🛠️ Manual Installation
 
 ### Prerequisites
-
 - Python 3.8+
-- FFmpeg (for video H.264 conversion)
+- [FFmpeg](https://ffmpeg.org/download.html) (Installed and in system PATH for video processing)
+- CUDA-capable GPU (Optional, for faster processing)
 
 ### Setup
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd People-Counting-v2
-```
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd People-Counting-v2
+   ```
 
-2. Install dependencies using `uv` (recommended) or `pip`:
-```bash
-# Using uv
-uv sync
+2. **Install dependencies**:
+   ```bash
+   # Using uv (recommended)
+   uv sync
+   
+   # OR using pip
+   pip install -r requirements.txt
+   ```
 
-# Or using pip
-pip install -r requirements.txt
-```
+3. **Configure Environment**:
+   Create a `.env` file in the root directory:
+   ```bash
+   APP_PASSWORD=admin  # Set your desired password here
+   ```
 
-3. Ensure FFmpeg is installed and in your PATH:
-```bash
-# Windows (using chocolatey)
-choco install ffmpeg
+4. **Start the Server**:
+   ```bash
+   uv run uvicorn main:app --reload
+   ```
 
-# macOS (using homebrew)
-brew install ffmpeg
+5. **Access the Application**:
+   Go to `http://127.0.0.1:8000` and log in.
 
-# Linux (Ubuntu/Debian)
-sudo apt-get install ffmpeg
-```
+---
 
-## Usage
+## 🖥️ Web Interface Features
 
-### Starting the Server
+The web UI provides an intuitive way to upload files and configure detection settings.
 
-```bash
-uv run uvicorn endpoints:app --reload
-```
+### Processing Modes
+1. **Basic Image**: Standard full-frame YOLO detection.
+2. **Sliced Image**: Divides large images into tiles (SAHI) to detect small objects.
+3. **Basic Video**: Frame-by-frame detection with unique object tracking (ByteTrack).
+4. **Sliced Video**: Combines slicing + tracking for small objects in video.
+5. **Polygon Crossing (Video)**: Interactive tool to draw a line/zone; counts objects crossing it.
+6. **Image Zone Counting**: Interactive tool to draw a polygon on an image; counts objects inside.
 
-The server will start at `http://127.0.0.1:8000`
+### Settings
+- **Model**: Select from Nano (fastest) to Extra Large (most accurate), or a custom drone model.
+- **Confidence**: Adjust detection sensitivity (0.1 - 1.0).
+- **Classes**: Filter specific objects (e.g., input `0` for person, `2` for car).
 
-### Web Interface
+---
 
-1. Open your browser to `http://127.0.0.1:8000`
-2. Select a file (image or video)
-3. Choose a processing type
-4. Configure settings (model, confidence threshold, slicing parameters)
-5. Click "Upload & Process"
-6. View results and annotated output
+## 🔌 API Reference
 
-### Processing Type Settings
+All API endpoints are protected and require **HTTP Basic Auth**.
 
-#### Basic Image / Video
-- **Model**: YOLO model file (default: `yolo11n.pt`)
-- **Confidence Threshold**: Detection confidence (0.0-1.0, default: 0.35)
+### 1. Basic Count
+`POST /basic-count`
+- **file**: Image file
+- **model**: Model name (default: `yolo11n.pt`)
+- **classes**: JSON list of class IDs (e.g., `[0, 2]`)
 
-#### Sliced Image
-Additional settings for SAHI sliced inference:
-- **Slice Width/Height**: Size of each slice in pixels (default: 256x256)
-- **Overlap Width/Height Ratio**: Overlap between slices as ratio (0.0-1.0, default: 0.2)
+### 2. Sliced Count (SAHI)
+`POST /sliced-count`
+- **file**: Image file
+- **slice_width/height**: Tile size (e.g., 256)
+- **overlap_width/height_ratio**: Overlap (e.g., 0.2)
+- **classes**: JSON list of class IDs
 
-#### Sliced Video
-Additional settings for sliced video processing:
-- **Slice Width/Height**: Size of each slice in pixels (default: 960x960)
-- **Overlap Width/Height**: Overlap between slices in pixels (default: 10px)
+### 3. Video Tracking
+`POST /video-count`
+- **file**: Video file
+- **model**: Model path
+- **classes**: JSON list of class IDs
+- Returns H.264 encoded video with tracking IDs.
 
-## API Endpoints
+### 4. Polygon Crossing (Video)
+`POST /polygon-cross-count`
+- **file**: Video file
+- **region_points**: String representation of list of tuples, e.g., `"[(100,100), (100,500)]"` (vertical line).
+- **classes**: JSON list of class IDs
 
-### POST `/basic-count`
-Process an image with standard YOLO inference.
+### 5. Image Zone Count
+`POST /image-zone-count`
+- **file**: Image file
+- **region_points**: Polygon coordinates, e.g., `"[(50,50), (200,50), (200,200), (50,200)]"`.
+- **classes**: JSON list of class IDs
 
-**Form Data:**
-- `file`: Image file
-- `model`: Model path (optional, default: "yolo11n.pt")
-- `conf_threshold`: Confidence threshold (optional, default: 0.35)
+---
 
-**Response:**
-```json
-{
-  "counts": {"person": 5, "car": 2},
-  "annotated_file": "/results/filename_annotated.png"
-}
-```
-
-### POST `/sliced-count`
-Process an image with SAHI sliced inference.
-
-**Form Data:**
-- `file`: Image file
-- `model`: Model path (optional)
-- `conf_threshold`: Confidence threshold (optional)
-- `slice_width`: Slice width in pixels (optional, default: 256)
-- `slice_height`: Slice height in pixels (optional, default: 256)
-- `overlap_width_ratio`: Overlap ratio (optional, default: 0.2)
-- `overlap_height_ratio`: Overlap ratio (optional, default: 0.2)
-
-### POST `/video-count`
-Process a video with object tracking.
-
-**Form Data:**
-- `file`: Video file
-- `model`: Model path (optional)
-- `conf_threshold`: Confidence threshold (optional)
-
-**Response:**
-```json
-{
-  "counts": {"person": 12, "car": 5},
-  "annotated_file": "/results/filename_annotated_h264.mp4"
-}
-```
-
-### POST `/sliced-video-count`
-Process a video with sliced inference and tracking.
-
-**Form Data:**
-- `file`: Video file
-- `model`: Model path (optional)
-- `conf_threshold`: Confidence threshold (optional)
-- `slice_width`: Slice width in pixels (optional, default: 960)
-- `slice_height`: Slice height in pixels (optional, default: 960)
-- `overlap_width`: Overlap in pixels (optional, default: 10)
-- `overlap_height`: Overlap in pixels (optional, default: 10)
-
-### GET `/results/{filename}`
-Retrieve processed result files (images/videos).
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 People-Counting-v2/
-├── main.py              # Core processing functions
-├── endpoints.py         # FastAPI application and routes
-├── static/              # Web UI files
-│   ├── index.html       # Main HTML interface
-│   ├── script.js        # Frontend JavaScript
-│   └── style.css        # Styling
-├── uploads/             # Temporary upload storage
-├── results/             # Processed output files
-├── .gitignore          # Git ignore rules
-└── README.md           # This file
+├── main.py              # Auth & App Entry Point
+├── endpoints.py         # API Route definitions
+├── functions.py         # Core logic (YOLO, SAHI, Tracking, Zones)
+├── static/              # Frontend (HTML, CSS, JS)
+├── uploads/             # Temp storage
+├── results/             # Processed outputs
+├── training.py          # YOLO Training script
+└── Dockerfile           # Container configuration
 ```
 
-## Technical Details
+## ⚠️ Troubleshooting
 
-### Video Processing Pipeline
-
-1. **Upload** - Video uploaded via web UI or API
-2. **Process** - Frame-by-frame detection with optional slicing
-3. **Track** - ByteTrack assigns unique IDs to objects across frames
-4. **Annotate** - Bounding boxes and labels drawn on frames
-5. **Encode** - Initial mp4v encoding for speed
-6. **Convert** - FFmpeg converts to H.264 for browser compatibility
-7. **Serve** - Video available for playback or download
-
-### Sliced Inference
-
-SAHI (Slicing Aided Hyper Inference) improves detection of small objects by:
-- Dividing large images into smaller overlapping tiles
-- Running inference on each tile
-- Merging predictions with NMS to remove duplicates
-- Particularly effective for aerial imagery, crowd scenes, and distant objects
-
-### Object Tracking
-
-ByteTrack tracking provides:
-- Unique ID assignment for each detected object
-- Consistent tracking across video frames
-- Accurate counting of unique objects (not just detections)
-- Handles occlusions and temporary disappearances
-
-## Configuration
-
-### Model Selection
-
-The system supports any YOLO11 model. Common options:
-- `yolo11n.pt` - Nano (fastest, least accurate)
-- `yolo11s.pt` - Small
-- `yolo11m.pt` - Medium
-- `yolo11l.pt` - Large
-- `yolo11x.pt` - Extra Large (slowest, most accurate)
-
-Place custom models in the project directory and reference by filename.
-
-### Confidence Threshold
-
-Lower values (0.1-0.3) detect more objects but may include false positives.
-Higher values (0.5-0.8) are more conservative but may miss objects.
-Default of 0.35 provides a good balance for most use cases.
-
-## Troubleshooting
-
-### Video Won't Play in Browser
-- Ensure FFmpeg is installed and in PATH
-- Check server logs for H.264 conversion errors
-- Try downloading the video file directly
-
-### Poor Detection Results
-- Try sliced inference for small objects
-- Adjust confidence threshold
-- Use a larger/more accurate model
-- Increase slice overlap for better coverage
-
-### Slow Processing
-- Use a smaller model (e.g., yolo11n.pt)
-- Reduce slice dimensions
-- Process shorter video clips
-- Consider GPU acceleration (requires CUDA setup)
-
-## Dependencies
-
-- **ultralytics** - YOLO11 implementation
-- **sahi** - Slicing Aided Hyper Inference
-- **supervision** - Detection utilities and tracking
-- **FastAPI** - Web framework
-- **OpenCV** - Image/video processing
-- **FFmpeg** - Video encoding
-
-## License
-
-[Add your license here]
-
-## Contributing
-
-[Add contribution guidelines here]
-
-## Acknowledgments
-
-- YOLO11 by Ultralytics
-- SAHI by obss
-- ByteTrack tracking algorithm
-- Supervision library by Roboflow
+- **401 Unauthorized**: Ensure you are sending the correct password in the Basic Auth header or logging in via the browser.
+- **Video Playback Fails**: Confirm `ffmpeg` is installed. The app attempts to convert videos to H.264 automatically.
+- **CUDA Not Used**: Ensure `torch.cuda.is_available()` is True. The app defaults to CPU if no GPU is found.

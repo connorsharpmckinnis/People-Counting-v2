@@ -19,6 +19,10 @@ const imgZonePointsInput = document.getElementById("imgZonePoints");
 const imgZoneClearBtn = document.getElementById("imgZoneClearBtn");
 const imgZonePointCountSpan = document.getElementById("imgZonePointCount");
 
+
+const modelSelect = document.getElementById("modelSelect");
+const modelInput = document.getElementById("modelInput");
+
 // Update confidence value display in real-time
 confInput.addEventListener("input", () => {
     confValue.textContent = confInput.value;
@@ -49,6 +53,10 @@ typeSelect.addEventListener("change", () => {
             loadImageToCanvas(fileInput.files[0]);
         }
     }
+});
+
+modelSelect.addEventListener("change", () => {
+    modelInput.value = modelSelect.value;
 });
 
 // --- VIDEO REGION DRAWING LOGIC ---

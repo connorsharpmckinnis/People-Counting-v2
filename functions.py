@@ -83,11 +83,11 @@ def basic_count(image_path: str, config: dict):
 
     # Annotate
     image = cv2.imread(image_path)
-    box_annotator = sv.BoxAnnotator(thickness=2)
-    label_annotator = sv.LabelAnnotator(text_scale=0.5, text_thickness=1)
+    box_annotator = sv.BoxAnnotator(thickness=1)
+    label_annotator = sv.LabelAnnotator(text_scale=0.2, text_thickness=1)
 
     annotated = box_annotator.annotate(image.copy(), detections=detections)
-    annotated = label_annotator.annotate(annotated, detections=detections, labels=labels)
+    #annotated = label_annotator.annotate(annotated, detections=detections, labels=labels)
 
     # Save annotated image
     base, ext = os.path.splitext(image_path)
@@ -125,36 +125,72 @@ def sliced_count(image_path: str, config: dict):
         overlap_width_ratio=overlap_width_ratio,
     )
 
-    base, ext = os.path.splitext(image_path)
-    output_folder = f"{base}_annotated"      # folder SAHI will create
-    final_path = f"{base}_annotated{ext}"    # final annotated image path
-
-    # Filter by class if specified
+    # Optional class filtering
     classes_to_track = config.get("classes")
     if classes_to_track is not None:
-        # result.object_prediction_list contains ObjectPrediction items
-        # checking against category.id (int)
-        filtered_list = []
-        for pred in result.object_prediction_list:
-            if pred.category.id in classes_to_track:
-                filtered_list.append(pred)
-        result.object_prediction_list = filtered_list
+        result.object_prediction_list = [
+            pred for pred in result.object_prediction_list
+            if pred.category.id in classes_to_track
+        ]
 
-    # export visuals to folder
-    result.export_visuals(output_folder, text_size=int(1))
+    # ---- Convert SAHI predictions → Supervision Detections ----
+    xyxy = []
+    class_ids = []
+    scores = []
 
-    # move prediction_visual.png → desired path
-    shutil.move(
-        os.path.join(output_folder, "prediction_visual.png"),
-        final_path
+    for pred in result.object_prediction_list:
+        x1, y1, x2, y2 = pred.bbox.to_xyxy()
+        xyxy.append([x1, y1, x2, y2])
+        class_ids.append(pred.category.id)
+        scores.append(pred.score.value)
+
+    if len(xyxy) == 0:
+        image = cv2.imread(image_path)
+        base, ext = os.path.splitext(image_path)
+        out_path = f"{base}_annotated{ext}"
+        cv2.imwrite(out_path, image)
+        return {}, out_path
+
+    detections = sv.Detections(
+        xyxy=np.array(xyxy),
+        class_id=np.array(class_ids),
+        confidence=np.array(scores)
     )
 
-    # remove empty folder
-    os.rmdir(output_folder)
+    # ---- Build labels ----
+    category_names = detection_model.model.names
+    labels = [
+        f"{category_names[class_id]}"
+        for class_id in detections.class_id
+    ]
 
-    counts = Counter(pred.category.name for pred in result.object_prediction_list)
+    # ---- Annotate with Supervision ----
+    image = cv2.imread(image_path)
 
-    return dict(counts), final_path
+    box_annotator = sv.BoxAnnotator(thickness=2)
+    label_annotator = sv.LabelAnnotator(
+        text_scale=0.35,
+        text_thickness=2,
+        text_padding=2
+    )
+
+    annotated = box_annotator.annotate(
+        scene=image.copy(),
+        detections=detections
+    )
+    #annotated = label_annotator.annotate(
+    #    scene=annotated,
+    #    detections=detections,
+    #    labels=labels
+    #)
+
+    base, ext = os.path.splitext(image_path)
+    out_path = f"{base}_annotated{ext}"
+    cv2.imwrite(out_path, annotated)
+
+    counts = Counter(labels)
+
+    return dict(counts), out_path
 
 def video_count(video_path: str, config: dict):
     model_path = config.get("model", "yolo11n.pt")
@@ -208,6 +244,10 @@ def video_count(video_path: str, config: dict):
 
         # Convert YOLO result → Supervision Detections
         det = sv.Detections.from_ultralytics(frame_results)
+
+        if det.tracker_id is None or len(det) == 0:
+            writer.write(frame)
+            continue
 
         # Only keep detections with assigned track IDs
         det = det[det.tracker_id != None]
@@ -476,7 +516,7 @@ def image_zone_count(image_file: str, config: dict):
 def test():
 
     config = Config(
-        model="yolo11l.pt",
+        model="yolo11n.pt",
         classes=[0],
         tracker="bytetrack.yaml",
         conf_threshold=0.5,
@@ -490,7 +530,9 @@ def test():
         output_path="test_image_annotated.jpg",
         input_path="parade.jpg"
     )
-    image_zone_count("parade.jpg", config)
+    counts, path = video_count("test_video.mov", config)
+    print(counts)
+    print(path)
 
 
 if __name__ == "__main__":

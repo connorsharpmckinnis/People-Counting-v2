@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from typing import Optional, List, Tuple
 from pathlib import Path
 
+
 # Import your existing counting functions
 from functions import basic_count, sliced_count, video_count, sliced_video_count, video_polygon_cross_count, image_zone_count
 
@@ -24,6 +25,7 @@ def save_upload_file(upload_file: UploadFile, dest: Path) -> Path:
     with open(dest, "wb") as f:
         f.write(upload_file.file.read())
     return dest
+
 
 
 @router.post("/basic-count")
