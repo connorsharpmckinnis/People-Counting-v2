@@ -65,8 +65,40 @@ def convert_to_h264(input_path: str, output_path: str) -> bool:
         print(f"FFmpeg conversion failed: {e}")
         return False
 
+def save_image(source_filepath: str, content_to_save) -> str:
+    base, ext = os.path.splitext(source_filepath)
+    out_path = f"{base}_annotated{ext}"
+    
+    cv2.imwrite(out_path, content_to_save)
 
-def basic_count(image_path: str, config: dict):
+    return out_path 
+
+def annotate_image(image_path: str, detections: sv.Detections, labels: list):
+    image = cv2.imread(image_path)
+    box_annotator = sv.BoxAnnotator(thickness=3)
+    label_annotator = sv.LabelAnnotator(
+        text_scale=0.5,
+        text_thickness=2,
+        text_padding=2
+    )
+    annotated = box_annotator.annotate(
+        scene=image.copy(),
+        detections=detections
+    )
+    annotated = label_annotator.annotate(
+        scene=annotated,
+        detections=detections,
+        labels=labels
+    )
+    return annotated
+
+
+
+
+
+def basic_count(image_path: str, config: dict) -> tuple[dict, str]:
+
+
     model_path = config.get("model", "yolo11n.pt")
     conf_threshold = config.get("conf_threshold", 0.35)
 
@@ -80,26 +112,17 @@ def basic_count(image_path: str, config: dict):
 
     # Build labels like "person", "car", etc.
     labels = [model.names[int(cls_id)] for cls_id in detections.class_id]
+    counts = Counter(labels)
 
     # Annotate
-    image = cv2.imread(image_path)
-    box_annotator = sv.BoxAnnotator(thickness=1)
-    label_annotator = sv.LabelAnnotator(text_scale=0.2, text_thickness=1)
-
-    annotated = box_annotator.annotate(image.copy(), detections=detections)
-    #annotated = label_annotator.annotate(annotated, detections=detections, labels=labels)
+    annotated = annotate_image(image_path, detections, labels)
 
     # Save annotated image
-    base, ext = os.path.splitext(image_path)
-    out_path = f"{base}_annotated{ext}"
-    cv2.imwrite(out_path, annotated)
+    out_path = save_image(image_path, annotated)
 
-    # Count occurrences of each class
-    object_counts = Counter(labels)
+    return dict(counts), out_path
 
-    return dict(object_counts), out_path
-
-def sliced_count(image_path: str, config: dict):
+def sliced_count(image_path: str, config: dict) -> tuple[dict, str]:
     model = config.get("model", "yolo11n.pt")
     conf_threshold = config.get("conf_threshold", 0.35)
     slice_height = config.get("slice_height", 256)
@@ -145,11 +168,7 @@ def sliced_count(image_path: str, config: dict):
         scores.append(pred.score.value)
 
     if len(xyxy) == 0:
-        image = cv2.imread(image_path)
-        base, ext = os.path.splitext(image_path)
-        out_path = f"{base}_annotated{ext}"
-        cv2.imwrite(out_path, image)
-        return {}, out_path
+        return {}, image_path
 
     detections = sv.Detections(
         xyxy=np.array(xyxy),
@@ -165,34 +184,15 @@ def sliced_count(image_path: str, config: dict):
     ]
 
     # ---- Annotate with Supervision ----
-    image = cv2.imread(image_path)
-
-    box_annotator = sv.BoxAnnotator(thickness=2)
-    label_annotator = sv.LabelAnnotator(
-        text_scale=0.35,
-        text_thickness=2,
-        text_padding=2
-    )
-
-    annotated = box_annotator.annotate(
-        scene=image.copy(),
-        detections=detections
-    )
-    #annotated = label_annotator.annotate(
-    #    scene=annotated,
-    #    detections=detections,
-    #    labels=labels
-    #)
-
-    base, ext = os.path.splitext(image_path)
-    out_path = f"{base}_annotated{ext}"
-    cv2.imwrite(out_path, annotated)
+    annotated = annotate_image(image_path, detections, labels)
+    
+    out_path =save_image(image_path, annotated)
 
     counts = Counter(labels)
 
     return dict(counts), out_path
 
-def video_count(video_path: str, config: dict):
+def video_count(video_path: str, config: dict) -> tuple[dict, str]:
     model_path = config.get("model", "yolo11n.pt")
     conf_threshold = config.get("conf_threshold", 0.35)
 
@@ -293,7 +293,7 @@ def video_count(video_path: str, config: dict):
 def sliced_video_count(
     video_path: str, 
     config: dict
-):
+) -> tuple[dict, str]:
     model_path = config.get("model", "yolo11n.pt")
     base, ext = os.path.splitext(video_path)
     save_path = f"{base}_annotated.mp4"  # Force .mp4 extension
@@ -400,7 +400,7 @@ def sliced_video_count(
     final_counts = {cls: len(ids) for cls, ids in unique_ids.items()}
     return final_counts, final_path
 
-def video_polygon_cross_count(video_file: str, config: dict):
+def video_polygon_cross_count(video_file: str, config: dict) -> tuple[dict, str]:
     """
     Count objects crossing a line or polygon in a video and return:
     - dict of crossing counts
@@ -475,7 +475,7 @@ def video_polygon_cross_count(video_file: str, config: dict):
 
     return cross_counts, final_path
 
-def image_zone_count(image_file: str, config: dict):
+def image_zone_count(image_file: str, config: dict) -> tuple[dict, str]:
     """
     Count objects in a defined region of an image and save an annotated copy
     using the same naming convention as basic_count.
@@ -484,10 +484,6 @@ def image_zone_count(image_file: str, config: dict):
     # --- Load image ---
     image = cv2.imread(image_file)
     assert image is not None, "Could not read image file"
-
-    # --- Output path: same convention as basic_count ---
-    base, ext = os.path.splitext(image_file)
-    out_path = f"{base}_annotated{ext}"
 
     # --- Config ---
     model = config.get("model", "yolo11n.pt")
@@ -508,12 +504,12 @@ def image_zone_count(image_file: str, config: dict):
     results: solutions.RegionCounterResult = regioncounter.process(image)
 
     # --- Save annotated image ---
-    cv2.imwrite(out_path, results.plot_im)
+    out_path = save_image(image_file, results.plot_im)
 
     # --- Return counts + path ---
     return results.region_counts, out_path
 
-def video_heatmap(video_file: str, config: dict):
+def video_heatmap(video_file: str, config: dict) -> tuple[dict, str]:
     model = config.get("model")
     classes = config.get("classes")
     conf = config.get("conf_threshold")
@@ -572,7 +568,7 @@ def video_heatmap(video_file: str, config: dict):
 
     return results, final_path
 
-def image_custom_classes(image_file: str, config: dict):
+def image_custom_classes(image_file: str, config: dict) -> tuple[dict, str]:
     """
     Count objects (using custom classes) in an image and save an annotated copy
     using the same naming convention as basic_count.
@@ -603,16 +599,14 @@ def image_custom_classes(image_file: str, config: dict):
     #annotated = label_annotator.annotate(annotated, detections=detections, labels=labels)
 
     # Save annotated image
-    base, ext = os.path.splitext(image_file)
-    out_path = f"{base}_annotated{ext}"
-    cv2.imwrite(out_path, annotated)
+    out_path = save_image(image_file, annotated)
 
     # Count occurrences of each class
     object_counts = Counter(labels)
 
     return dict(object_counts), out_path
 
-def video_custom_classes(video_path: str, config: dict):
+def video_custom_classes(video_path: str, config: dict) -> tuple[dict, str]:
     model_path = config.get("model")
     classes = config.get("classes")
     tracker = config.get("tracker", "botsort.yaml")

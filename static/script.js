@@ -12,6 +12,7 @@ const confInput = document.getElementById("confInput");
 const confValue = document.getElementById("confValue");
 const btnText = document.getElementById("btnText");
 const btnLoader = document.getElementById("btnLoader");
+const downloadBtn = document.getElementById("downloadResultBtn");
 
 const imageZoneSettings = document.getElementById("imageZoneSettings");
 const imgZoneCanvas = document.getElementById("imgZoneCanvas");
@@ -383,6 +384,7 @@ form.addEventListener("submit", async (e) => {
     resultsEl.textContent = "Processing your file...";
     imgEl.style.display = "none";
     videoEl.style.display = "none";
+    downloadBtn.style.display = "none";
     resultsSection.style.display = "block";
 
     try {
@@ -415,6 +417,10 @@ form.addEventListener("submit", async (e) => {
             videoEl.style.display = "block";
             imgEl.style.display = "none";
         }
+
+        // Show download button
+        downloadBtn.href = data.annotated_file;
+        downloadBtn.style.display = "inline-block";
 
         // Scroll to results
         resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

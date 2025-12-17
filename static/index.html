@@ -51,8 +51,8 @@
                     <option value="sliced_video">Sliced Video (Better for small objects)</option>
                     <option value="polygon_cross_count">Polygon Crossing (Video)</option>
                     <option value="image_zone_count">Image Zone Counting</option>
-                    <option value="image_custom">Image Custom Classes</option>
-                    <option value="video_custom">Video Custom Classes</option>
+                    <option value="image_custom">Image (Custom Classes)</option>
+                    <option value="video_custom">Video (Custom Classes)</option>
                 </select>
             </div>
 
@@ -74,7 +74,7 @@
                         <option value="yolo11l.pt">Large</option>
                         <option value="yolo11x.pt">Extra Large (Most Accurate)</option>
                         <option value="yolo11n_drone.pt">People Only (Best with Aerial Crowds)</option>
-                        <option value="yolov8s-world.pt">YOLO World (Open Vocabulary)</option>
+                        <option value="yolov8s-world.pt">YOLO World (Custom Classes)</option>
                     </select>
                 </div>
 
@@ -307,6 +307,11 @@
                     <h3>Annotated Output</h3>
                     <img id="annotatedImage" style="display:none;">
                     <video id="annotatedVideo" controls style="display:none;"></video>
+
+                    <a id="downloadResultBtn" href="#" class="btn btn-primary" download
+                        style="display:none; width: 100%; margin-top: 15px; text-align: center;">
+                        ⬇️ Download Result
+                    </a>
                 </div>
             </div>
         </div>
