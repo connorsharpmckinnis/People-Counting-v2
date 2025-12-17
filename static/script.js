@@ -60,20 +60,41 @@ typeSelect.addEventListener("change", () => {
     }
 
     // Toggle between Standard (COCO IDs) and Custom (Strings) Class Inputs
-    if (typeSelect.value === "image_custom" || typeSelect.value === "video_custom") {
-        standardClassesGroup.style.display = "none";
-        customClassesGroup.style.display = "block";
+    const isCustom = (typeSelect.value === "image_custom" || typeSelect.value === "video_custom");
 
-        // Auto-select YOLOWorld if not already selected
-        if (modelSelect.value !== "yolov8s-world.pt") {
-            modelSelect.value = "yolov8s-world.pt";
-            modelInput.value = "yolov8s-world.pt";
+    // 1. Toggle Input Groups
+    standardClassesGroup.style.display = isCustom ? "none" : "block";
+    customClassesGroup.style.display = isCustom ? "block" : "none";
+
+    // 2. Manage Model Options (Mutually Exclusive)
+    Array.from(modelSelect.options).forEach(opt => {
+        if (opt.value === "yoloe-11s-seg.pt") {
+            // YOLOE is ONLY for Custom
+            opt.disabled = !isCustom;
+        } else {
+            // All other models are ONLY for Standard
+            opt.disabled = isCustom;
+        }
+    });
+
+    // 3. Auto-switch if selection is invalid
+    // If we just switched to Custom, we force YOLOE.
+    // If we switched to Standard, we force Nano (if current was YOLOE).
+    if (isCustom) {
+        if (modelSelect.value !== "yoloe-11s-seg.pt") {
+            modelSelect.value = "yoloe-11s-seg.pt";
+            modelInput.value = "yoloe-11s-seg.pt";
         }
     } else {
-        standardClassesGroup.style.display = "block";
-        customClassesGroup.style.display = "none";
+        if (modelSelect.value === "yoloe-11s-seg.pt") {
+            modelSelect.value = "yolo11n.pt";
+            modelInput.value = "yolo11n.pt";
+        }
     }
 });
+
+// Initialize state on load
+typeSelect.dispatchEvent(new Event('change'));
 
 modelSelect.addEventListener("change", () => {
     modelInput.value = modelSelect.value;

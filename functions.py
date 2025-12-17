@@ -2,7 +2,7 @@
 from sahi import AutoDetectionModel
 from sahi.predict import get_prediction, get_sliced_prediction, predict
 from collections import Counter
-from ultralytics import YOLO, solutions, YOLOWorld 
+from ultralytics import YOLO, solutions, YOLOWorld, YOLOE
 from ultralytics.trackers.byte_tracker import BYTETracker
 from collections import defaultdict
 import cv2
@@ -577,7 +577,7 @@ def image_custom_classes(image_file: str, config: dict) -> tuple[dict, str]:
     model = config.get("model")
     conf = config.get("conf_threshold")
     
-    model = YOLO(model)
+    model = YOLOE(model)
 
     model.set_classes(classes)
 
@@ -612,7 +612,7 @@ def video_custom_classes(video_path: str, config: dict) -> tuple[dict, str]:
     tracker = config.get("tracker", "botsort.yaml")
     conf_threshold = config.get("conf_threshold")
 
-    model = YOLOWorld(model_path)
+    model = YOLOE(model_path)
 
     model.set_classes(classes)
 
@@ -706,12 +706,11 @@ def video_custom_classes(video_path: str, config: dict) -> tuple[dict, str]:
 
     count_dict = {cls: len(ids) for cls, ids in seen_ids.items()}
     return count_dict, final_path
-
     
 def test():
 
     config = Config(
-        model="yolov8s-world.pt",
+        model="yoloe-11s-seg.pt",
         classes=['animal', 'human', 'hat'],
         tracker="botsort.yaml",
         conf_threshold=0.2,
@@ -722,10 +721,10 @@ def test():
         overlap_height_ratio=0.2,
         overlap_width_ratio=0.2,
         #region_points=[(100, 100), (100, 500), (500, 500), (500, 100)],
-
     )
-    results = video_custom_classes("test_video.mov", config)
-    print(results)
+    
+    results = image_custom_classes("horse.png", config)
+    print(f'YOLOE: {results}')
 
 
 if __name__ == "__main__":
