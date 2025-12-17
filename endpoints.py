@@ -8,7 +8,8 @@ from pathlib import Path
 
 
 # Import your existing counting functions
-from functions import basic_count, sliced_count, video_count, sliced_video_count, video_polygon_cross_count, image_zone_count
+# Import your existing counting functions
+from functions import basic_count, sliced_count, video_count, sliced_video_count, video_polygon_cross_count, image_zone_count, image_custom_classes, video_custom_classes
 
 router = APIRouter()
 
@@ -344,3 +345,82 @@ async def get_result_file(filename: str):
         media_type="video/mp4" if filename.endswith(".mp4") else "image/png",
         filename=filename
     )
+
+
+@router.post("/image-custom-count")
+async def api_image_custom_count(
+    file: UploadFile = File(...),
+    model: Optional[str] = Form("yolov8s-world.pt"),
+    conf_threshold: Optional[float] = Form(0.20),
+    classes: Optional[str] = Form(None)
+):
+    token = uuid.uuid4().hex
+    file_id = str(uuid.uuid4())
+    ext = Path(file.filename).suffix.lower()
+    filename = UPLOAD_DIR / f"{file_id}{ext}"
+    save_upload_file(file, filename)
+
+    # Parse classes (expecting comma-separated strings for YOLOWorld)
+    class_list = []
+    if classes:
+        # Split by comma and strip whitespace
+        class_list = [c.strip() for c in classes.split(",") if c.strip()]
+    
+    if not class_list:
+        class_list = ["person"] # Default fallback
+
+    config = {
+        "model": model,
+        "conf_threshold": conf_threshold,
+        "classes": class_list
+    }
+
+    counts, annotated_path = image_custom_classes(str(filename), config=config)
+
+    annotated_file = RESULTS_DIR / f"{token}{ext}"
+    os.replace(annotated_path, annotated_file)
+    TOKENS[token] = annotated_file
+
+    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "image"})
+
+
+@router.post("/video-custom-count")
+async def api_video_custom_count(
+    file: UploadFile = File(...),
+    model: Optional[str] = Form("yolov8s-world.pt"),
+    conf_threshold: Optional[float] = Form(0.20),
+    classes: Optional[str] = Form(None)
+):
+    token = uuid.uuid4().hex
+    file_id = str(uuid.uuid4())
+    ext = Path(file.filename).suffix.lower()
+    filename = UPLOAD_DIR / f"{file_id}{ext}"
+    save_upload_file(file, filename)
+
+    # Parse classes (expecting comma-separated strings for YOLOWorld)
+    class_list = []
+    if classes:
+        # Split by comma and strip whitespace
+        class_list = [c.strip() for c in classes.split(",") if c.strip()]
+
+    if not class_list:
+        class_list = ["person"] # Default fallback
+
+    config = {
+        "model": model,
+        "conf_threshold": conf_threshold,
+        "classes": class_list
+    }
+
+    counts, annotated_path = video_custom_classes(str(filename), config=config)
+
+    annotated_file = RESULTS_DIR / f"{token}{ext}"
+    
+    if Path(annotated_path).exists():
+        os.replace(annotated_path, annotated_file)
+    else:
+        return JSONResponse({"error": "Processing failed"}, status_code=500)
+
+    TOKENS[token] = annotated_file
+
+    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "video"})

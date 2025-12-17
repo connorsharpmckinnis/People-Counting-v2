@@ -2,7 +2,7 @@
 from sahi import AutoDetectionModel
 from sahi.predict import get_prediction, get_sliced_prediction, predict
 from collections import Counter
-from ultralytics import YOLO, solutions
+from ultralytics import YOLO, solutions, YOLOWorld 
 from ultralytics.trackers.byte_tracker import BYTETracker
 from collections import defaultdict
 import cv2
@@ -572,13 +572,155 @@ def video_heatmap(video_file: str, config: dict):
 
     return results, final_path
 
+def image_custom_classes(image_file: str, config: dict):
+    """
+    Count objects (using custom classes) in an image and save an annotated copy
+    using the same naming convention as basic_count.
+    """
+    classes = config.get("classes")
+    model = config.get("model")
+    conf = config.get("conf_threshold")
+    
+    model = YOLO(model)
+
+    model.set_classes(classes)
+
+    # Perform inference
+    results = model.predict(image_file, conf=conf)
+
+    # Convert YOLO results → Supervision Detections
+    detections = sv.Detections.from_ultralytics(results[0])
+
+    # Build labels like "person", "car", etc.
+    labels = [model.names[int(cls_id)] for cls_id in detections.class_id]
+
+    # Annotate
+    image = cv2.imread(image_file)
+    box_annotator = sv.BoxAnnotator(thickness=1)
+    label_annotator = sv.LabelAnnotator(text_scale=0.2, text_thickness=1)
+
+    annotated = box_annotator.annotate(image.copy(), detections=detections)
+    #annotated = label_annotator.annotate(annotated, detections=detections, labels=labels)
+
+    # Save annotated image
+    base, ext = os.path.splitext(image_file)
+    out_path = f"{base}_annotated{ext}"
+    cv2.imwrite(out_path, annotated)
+
+    # Count occurrences of each class
+    object_counts = Counter(labels)
+
+    return dict(object_counts), out_path
+
+def video_custom_classes(video_path: str, config: dict):
+    model_path = config.get("model")
+    classes = config.get("classes")
+    tracker = config.get("tracker", "botsort.yaml")
+    conf_threshold = config.get("conf_threshold")
+
+    model = YOLOWorld(model_path)
+
+    model.set_classes(classes)
+
+    # Prepare output path
+    base, ext = os.path.splitext(video_path)
+    out_path = f"{base}_annotated.mp4"  # Force .mp4 extension
+
+    # Grab video metadata for writer
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise ValueError(f"Could not open input video: {video_path}")
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    # Use mp4v codec (most reliable on Windows)
+    writer = cv2.VideoWriter(
+        out_path,
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        fps,
+        (width, height)
+    )
+
+    # Supervision annotators
+    box_annotator = sv.BoxAnnotator(thickness=2)
+    label_annotator = sv.LabelAnnotator(
+        text_scale=0.8,
+        text_thickness=2,
+        text_color=sv.Color.WHITE
+    )
+
+    # YOLO with tracking
+    results_stream = model.track(
+        source=video_path,
+        tracker="botsort.yaml",
+        stream=True,
+        conf=conf_threshold
+    )
+
+    seen_ids = {}
+    class_names = model.names
+
+    for frame_results in results_stream:
+        frame = frame_results.orig_img.copy()
+
+        # Convert YOLO result → Supervision Detections
+        det = sv.Detections.from_ultralytics(frame_results)
+
+        if det.tracker_id is None or len(det) == 0:
+            writer.write(frame)
+            continue
+
+        # Only keep detections with assigned track IDs
+        det = det[det.tracker_id != None]
+
+        # Generate labels like "person #12"
+        labels = []
+        for cls_id, track_id in zip(det.class_id, det.tracker_id):
+            cls_name = class_names[cls_id]
+            labels.append(f"{cls_name} #{track_id}")
+
+            # Track unique IDs per class
+            seen_ids.setdefault(cls_name, set()).add(int(track_id))
+
+        # Annotate
+        annotated = box_annotator.annotate(scene=frame, detections=det)
+        annotated = label_annotator.annotate(scene=annotated, detections=det, labels=labels)
+
+        writer.write(annotated)
+
+    writer.release()
+    cap.release()
+    cv2.destroyAllWindows()
+    
+    # Small delay to ensure file is fully written and unlocked on Windows
+    time.sleep(0.5)
+
+    # Convert to H.264 for browser compatibility
+    base, ext = os.path.splitext(out_path)
+    h264_path = f"{base}_h264.mp4"
+    
+    if convert_to_h264(out_path, h264_path):
+        # Conversion successful, remove the mp4v version and use H.264
+        os.remove(out_path)
+        final_path = h264_path
+    else:
+        # Conversion failed, use the mp4v version (user can download it)
+        print("Warning: H.264 conversion failed, using mp4v format")
+        final_path = out_path
+
+    count_dict = {cls: len(ids) for cls, ids in seen_ids.items()}
+    return count_dict, final_path
+
+    
 def test():
 
     config = Config(
-        model="yolo11n.pt",
-        #classes=[0],
+        model="yolov8s-world.pt",
+        classes=['animal', 'human', 'hat'],
         tracker="botsort.yaml",
-        conf_threshold=0.5,
+        conf_threshold=0.2,
         slice_wh=(960, 960),
         overlap_wh=(10, 10),
         slice_height=256,
@@ -588,9 +730,8 @@ def test():
         #region_points=[(100, 100), (100, 500), (500, 500), (500, 100)],
 
     )
-    counts, path = video_heatmap("test_video.mov", config)
-    print(counts)
-    print(path)
+    results = video_custom_classes("test_video.mov", config)
+    print(results)
 
 
 if __name__ == "__main__":

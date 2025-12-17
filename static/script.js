@@ -23,6 +23,9 @@ const imgZonePointCountSpan = document.getElementById("imgZonePointCount");
 
 const modelSelect = document.getElementById("modelSelect");
 const modelInput = document.getElementById("modelInput");
+const standardClassesGroup = document.getElementById("standardClassesGroup");
+const customClassesGroup = document.getElementById("customClassesGroup");
+const customClassesInput = document.getElementById("customClassesInput");
 
 // Update confidence value display in real-time
 confInput.addEventListener("input", () => {
@@ -53,6 +56,21 @@ typeSelect.addEventListener("change", () => {
         if (fileInput.files.length > 0) {
             loadImageToCanvas(fileInput.files[0]);
         }
+    }
+
+    // Toggle between Standard (COCO IDs) and Custom (Strings) Class Inputs
+    if (typeSelect.value === "image_custom" || typeSelect.value === "video_custom") {
+        standardClassesGroup.style.display = "none";
+        customClassesGroup.style.display = "block";
+
+        // Auto-select YOLOWorld if not already selected
+        if (modelSelect.value !== "yolov8s-world.pt") {
+            modelSelect.value = "yolov8s-world.pt";
+            modelInput.value = "yolov8s-world.pt";
+        }
+    } else {
+        standardClassesGroup.style.display = "block";
+        customClassesGroup.style.display = "none";
     }
 });
 
@@ -300,17 +318,27 @@ form.addEventListener("submit", async (e) => {
     formData.append("file", fileInput.files[0]);
     formData.append("model", model);
     formData.append("conf_threshold", conf);
-    if (classInput) {
-        const classes = classInput
-            .split(",")
-            .map(v => v.trim())
-            .filter(v => v !== "")
-            .map(v => Number(v))
-            .filter(v => Number.isInteger(v) && v >= 0);
+    // integer class parsing (Standard Modes)
+    if (typeSelect.value !== "image_custom" && typeSelect.value !== "video_custom") {
+        if (classInput) {
+            const classes = classInput
+                .split(",")
+                .map(v => v.trim())
+                .filter(v => v !== "")
+                .map(v => Number(v))
+                .filter(v => Number.isInteger(v) && v >= 0);
 
-        if (classes.length > 0) {
-            // Send as JSON string; FastAPI will parse it
-            formData.append("classes", JSON.stringify(classes));
+            if (classes.length > 0) {
+                // Send as JSON string; FastAPI will parse it
+                formData.append("classes", JSON.stringify(classes));
+            }
+        }
+    } else {
+        // user string parsing (Custom Modes)
+        // pass the raw string from the custom input, backend handles list conversion
+        const customClasses = customClassesInput.value.trim();
+        if (customClasses) {
+            formData.append("classes", customClasses);
         }
     }
 
@@ -348,6 +376,8 @@ form.addEventListener("submit", async (e) => {
         case "sliced_video": endpoint = "/sliced-video-count"; break;
         case "polygon_cross_count": endpoint = "/polygon-cross-count"; break;
         case "image_zone_count": endpoint = "/image-zone-count"; break;
+        case "image_custom": endpoint = "/image-custom-count"; break;
+        case "video_custom": endpoint = "/video-custom-count"; break;
     }
 
     resultsEl.textContent = "Processing your file...";
