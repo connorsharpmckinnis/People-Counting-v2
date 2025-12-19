@@ -97,6 +97,12 @@ def estimate_image_complexity(image_path: str, config: dict) -> dict:
         slice_wh = config.get("slice_wh")
         overlap_wh = config.get("overlap_wh")
          
+        # Ensure they are tuples of ints if they came back from JSON as lists
+        if isinstance(slice_wh, (list, tuple)):
+            slice_wh = tuple(int(x) for x in slice_wh)
+        if isinstance(overlap_wh, (list, tuple)):
+            overlap_wh = tuple(int(x) for x in overlap_wh)
+
         # Check if slice params exist separately in config (endpoints might pass them differently)
         if not slice_wh:
             sw = config.get("slice_width")
@@ -144,7 +150,13 @@ def estimate_video_complexity(video_path: str, config: dict) -> dict:
         
         slice_wh = config.get("slice_wh")
         overlap_wh = config.get("overlap_wh")
-        
+         
+        # Ensure they are tuples of ints if they came back from JSON as lists
+        if isinstance(slice_wh, (list, tuple)):
+            slice_wh = tuple(int(x) for x in slice_wh)
+        if isinstance(overlap_wh, (list, tuple)):
+            overlap_wh = tuple(int(x) for x in overlap_wh)
+
         # Check if slice params exist separately
         if not slice_wh:
             sw = config.get("slice_width")
@@ -153,10 +165,12 @@ def estimate_video_complexity(video_path: str, config: dict) -> dict:
                 slice_wh = (int(sw), int(sh))
         
         if not overlap_wh and slice_wh:
-            # Defaults if not provided but slicing requested? 
-            # Or assume no slicing if not provided.
-            # But usually this function is called when specific slicing is expected or just general estimate.
-            pass
+            # Maybe passed as loose keys
+            ow = config.get("overlap_width")
+            oh = config.get("overlap_height")
+            if ow is not None and oh is not None:
+                overlap_wh = (int(ow), int(oh))
+
 
         # If we have slice config, calculate. Otherwise 1 slice (whole frame).
         slices_per_frame = 1
@@ -435,8 +449,15 @@ def sliced_video_count(
     model_path = config.get("model", "yolo11n.pt")
     base, ext = os.path.splitext(video_path)
     save_path = f"{base}_annotated.mp4"  # Force .mp4 extension
-    slice_wh = config.get("slice_wh", (960, 960))
-    overlap_wh = config.get("overlap_wh", (10, 10))
+    slice_wh = config.get("slice_wh") or (960, 960)
+    # Ensure slice_wh is a tuple of integers
+    if isinstance(slice_wh, (list, tuple)):
+         slice_wh = tuple(int(x) for x in slice_wh)
+    
+    overlap_wh = config.get("overlap_wh") or (10, 10)
+    if isinstance(overlap_wh, (list, tuple)):
+        overlap_wh = tuple(int(x) for x in overlap_wh)
+
     conf_threshold = config.get("conf_threshold", 0.50)
     
     
@@ -568,6 +589,10 @@ def video_polygon_cross_count(video_file: str, config: dict) -> tuple[dict, str]
     if not region_points:
         mid_x = w // 2
         region_points = [(mid_x, 0), (mid_x, h)]
+    
+    # Ensure region_points is a list of tuples (JSON gives list of lists)
+    if isinstance(region_points, list):
+        region_points = [tuple(p) if isinstance(p, list) else p for p in region_points]
 
     counter = solutions.ObjectCounter(
         show=False,
@@ -628,6 +653,10 @@ def image_zone_count(image_file: str, config: dict) -> tuple[dict, str]:
     conf = config.get("conf_threshold", 0.5)
     classes = config.get("classes")
     region_points = config.get("region_points")
+    
+    # Ensure region_points is a list of tuples (JSON gives list of lists)
+    if isinstance(region_points, list):
+        region_points = [tuple(p) if isinstance(p, list) else p for p in region_points]
 
     # --- Initialize region counter ---
     regioncounter = solutions.RegionCounter(
@@ -652,6 +681,10 @@ def video_heatmap(video_file: str, config: dict) -> tuple[dict, str]:
     classes = config.get("classes")
     conf = config.get("conf_threshold")
     region_points = config.get("region_points")
+    
+    # Ensure region_points is a list of tuples (JSON gives list of lists)
+    if isinstance(region_points, list):
+        region_points = [tuple(p) if isinstance(p, list) else p for p in region_points]
     
     base, ext = os.path.splitext(video_file)
     save_path = config.get("save_path", f"{base}_annotated.mp4")

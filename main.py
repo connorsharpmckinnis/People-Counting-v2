@@ -5,10 +5,40 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import secrets
 import os
+import multiprocessing
+import contextlib
 
 from endpoints import router
+from job_store import init_db
+from worker import worker_loop
 
-app = FastAPI()
+# Initialize DB on import (or startup)
+init_db()
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    queue = multiprocessing.Queue()
+    app.state.queue = queue
+    
+    # Start worker(s)
+    # User requested ability to scale later. We can easily change '1' to N or env var.
+    num_workers = int(os.getenv("NUM_WORKERS", "1"))
+    processes = []
+    
+    for _ in range(num_workers):
+        p = multiprocessing.Process(target=worker_loop, args=(queue,))
+        p.start()
+        processes.append(p)
+        
+    yield
+    
+    # Shutdown
+    for p in processes:
+        p.terminate()
+        p.join()
+
+app = FastAPI(lifespan=lifespan)
 security = HTTPBasic()
 
 APP_PASSWORD = os.getenv("APP_PASSWORD")
