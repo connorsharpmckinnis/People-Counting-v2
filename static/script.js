@@ -456,3 +456,122 @@ form.addEventListener("submit", async (e) => {
         form.querySelector(".submit-btn").disabled = false;
     }
 });
+
+// --- ESTIMATION LOGIC ---
+const estimationSection = document.getElementById("estimationSection");
+const estRes = document.getElementById("estRes");
+const estFrames = document.getElementById("estFrames");
+const estSlices = document.getElementById("estSlices");
+const estTotal = document.getElementById("estTotal");
+const estDuration = document.getElementById("estDuration");
+
+const debouncedUpdate = debounce(updateEstimation, 500);
+
+// Add listeners
+fileInput.addEventListener("change", updateEstimation);
+typeSelect.addEventListener("change", updateEstimation);
+
+// Sliced Image Inputs
+["imgSliceWidth", "imgSliceHeight", "imgOverlapWidthRatio", "imgOverlapHeightRatio"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("input", debouncedUpdate);
+});
+
+// Sliced Video Inputs
+["sliceWidth", "sliceHeight", "overlapWidth", "overlapHeight"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("input", debouncedUpdate);
+});
+
+
+async function updateEstimation() {
+    const file = fileInput.files[0];
+    if (!file) {
+        estimationSection.style.display = "none";
+        return;
+    }
+
+    estimationSection.style.display = "block";
+    estRes.textContent = "Calculating...";
+    estFrames.textContent = "...";
+    estSlices.textContent = "...";
+    estTotal.textContent = "...";
+    estDuration.textContent = "";
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // Add relevant settings based on type
+    // Note: We send all slice params if available, backend logic filters what it needs
+    // or we can be specific. Let's send what's relevant to current view.
+
+    if (typeSelect.value === "sliced") {
+        formData.append("slice_width", document.getElementById("imgSliceWidth").value);
+        formData.append("slice_height", document.getElementById("imgSliceHeight").value);
+        formData.append("overlap_width_ratio", document.getElementById("imgOverlapWidthRatio").value);
+        formData.append("overlap_height_ratio", document.getElementById("imgOverlapHeightRatio").value);
+    } else if (typeSelect.value === "sliced_video") {
+        formData.append("slice_width", document.getElementById("sliceWidth").value);
+        formData.append("slice_height", document.getElementById("sliceHeight").value);
+        formData.append("overlap_width", document.getElementById("overlapWidth").value);
+        formData.append("overlap_height", document.getElementById("overlapHeight").value);
+    }
+
+    try {
+        const response = await fetch("/estimate-count", {
+            method: "POST",
+            body: formData
+        });
+
+        if (!response.ok) throw new Error("Estimation failed");
+
+        const data = await response.json();
+
+        if (data.error) {
+            estRes.textContent = "Error";
+            estDuration.textContent = data.error;
+            return;
+        }
+
+        estRes.textContent = `${data.resolution[0]} x ${data.resolution[1]}`;
+        estFrames.textContent = data.total_frames;
+        estSlices.textContent = data.slices_per_frame;
+        estTotal.textContent = data.total_inference_steps.toLocaleString();
+
+        if (data.duration_seconds) {
+            estDuration.textContent = `Duration: ${data.duration_seconds}s @ ${data.fps}fps`;
+        } else {
+            estDuration.textContent = "";
+        }
+
+        // --- WARNING LOGIC ---
+        const totalSteps = data.total_inference_steps;
+        const estWarning = document.getElementById("estWarning");
+
+        if (totalSteps > 1000) {
+            estWarning.style.display = "block";
+            estWarning.style.color = "#d63031"; // red
+            estWarning.innerHTML = "⚠️ Whoa there! over 1,000 inferences? Are you trying to melt the server? (This will take a long time)";
+        } else if (totalSteps > 100) {
+            estWarning.style.display = "block";
+            estWarning.style.color = "#fdcb6e"; // orange/yellow
+            estWarning.style.color = "#e17055"; // darker orange for readability
+            estWarning.textContent = "⏳ This might take a minute or two...";
+        } else {
+            estWarning.style.display = "none";
+        }
+
+    } catch (e) {
+        console.error("Estimation error:", e);
+        estRes.textContent = "-";
+        estDuration.textContent = "Could not estimate (server error)";
+    }
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}

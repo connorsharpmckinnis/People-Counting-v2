@@ -5,9 +5,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import secrets
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 from endpoints import router
 

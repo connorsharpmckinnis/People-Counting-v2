@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Import your existing counting functions
 # Import your existing counting functions
-from functions import basic_count, sliced_count, video_count, sliced_video_count, video_polygon_cross_count, image_zone_count, image_custom_classes, video_custom_classes
+from functions import basic_count, sliced_count, video_count, sliced_video_count, video_polygon_cross_count, image_zone_count, image_custom_classes, video_custom_classes, estimate_image_complexity, estimate_video_complexity
 
 router = APIRouter()
 
@@ -424,3 +424,45 @@ async def api_video_custom_count(
     TOKENS[token] = annotated_file
 
     return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "video"})
+
+@router.post("/estimate-count")
+async def api_estimate_count(
+    file: UploadFile = File(...),
+    slice_width: Optional[int] = Form(None),
+    slice_height: Optional[int] = Form(None),
+    overlap_width_ratio: Optional[float] = Form(None),
+    overlap_height_ratio: Optional[float] = Form(None),
+    overlap_width: Optional[int] = Form(None),
+    overlap_height: Optional[int] = Form(None),
+):
+    token = uuid.uuid4().hex
+    file_id = str(uuid.uuid4())
+    ext = Path(file.filename).suffix.lower()
+    filename = UPLOAD_DIR / f"{file_id}{ext}"
+    save_upload_file(file, filename)
+
+    # config construction
+    config = {}
+    if slice_width: config["slice_width"] = slice_width
+    if slice_height: config["slice_height"] = slice_height
+    if overlap_width_ratio: config["overlap_width_ratio"] = overlap_width_ratio
+    if overlap_height_ratio: config["overlap_height_ratio"] = overlap_height_ratio
+    if overlap_width: config["overlap_width"] = overlap_width
+    if overlap_height: config["overlap_height"] = overlap_height
+
+    # Logic to pick image vs video
+    if ext in [".jpg", ".jpeg", ".png", ".bmp", ".webp"]:
+        result = estimate_image_complexity(str(filename), config)
+    elif ext in [".mp4", ".avi", ".mov", ".mkv"]:
+        result = estimate_video_complexity(str(filename), config)
+    else:
+        result = {"error": f"Unsupported file type: {ext}"}
+
+    # Clean up temp file immediately? 
+    # For now, yes, as we just want an estimate.
+    try:
+        os.remove(filename)
+    except:
+        pass
+
+    return JSONResponse(result)

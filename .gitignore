@@ -26,3 +26,4 @@ uploads/
 
 # Large models
 yolo11x.pt
+mobileclip_blt.ts

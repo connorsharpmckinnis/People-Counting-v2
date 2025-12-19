@@ -4,11 +4,14 @@ FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+
+
 # Install system-level dependencies required by OpenCV and Ultralytics
 RUN apt-get update && apt-get install -y \
     libgl1 \
     libglib2.0-0 \
     ffmpeg \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
@@ -19,6 +22,8 @@ COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+
+RUN pip install --no-cache-dir git+https://github.com/ultralytics/CLIP.git
 
 # Copy the rest of the project
 COPY main.py endpoints.py functions.py /app/

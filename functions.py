@@ -45,6 +45,144 @@ class Config(TypedDict):
     input_path: Optional[str]
     """Input path"""
 
+def calculate_slices(image_wh: tuple, slice_wh: tuple, overlap_wh: tuple) -> int:
+    """
+    Calculate the number of slices for a given image resolution and slice configuration.
+    Mimics typical tiling logic (e.g. SAHI).
+    """
+    import math
+    img_w, img_h = image_wh
+    slice_w, slice_h = slice_wh
+    overlap_w, overlap_h = overlap_wh
+
+    # Basic validation
+    if slice_w <= 0 or slice_h <= 0:
+        return 1
+    
+    # If image is smaller than slice, it's just 1 slice (typically padded)
+    if img_w <= slice_w and img_h <= slice_h:
+        return 1
+
+    stride_w = slice_w - overlap_w
+    stride_h = slice_h - overlap_h
+
+    # Prevent infinite loop or div by zero if overlap >= slice
+    if stride_w <= 0: stride_w = slice_w
+    if stride_h <= 0: stride_h = slice_h
+
+    # Calculate steps in x and y
+    # We want to cover the whole image. 
+    # Logic: how many strides fit? +1 for the first slice.
+    # The last slice might overlap more than overlap_wh to align with edge, but it's still a slice.
+    
+    n_w = math.ceil((img_w - slice_w) / stride_w) + 1 if img_w > slice_w else 1
+    n_h = math.ceil((img_h - slice_h) / stride_h) + 1 if img_h > slice_h else 1
+
+    return n_w * n_h
+
+def estimate_image_complexity(image_path: str, config: dict) -> dict:
+    """
+    Estimate processing steps for an image.
+    """
+    try:
+        # Just read metadata if possible, but cv2.imread is reliable. 
+        # For huge images, this might be slowish but unavoidable to get accurate resolution if not trusted.
+        # Alternatively use PIL for faster header read.
+        image = cv2.imread(image_path)
+        if image is None: 
+            return {"error": "Could not read image"}
+        
+        h, w = image.shape[:2]
+        
+        slice_wh = config.get("slice_wh")
+        overlap_wh = config.get("overlap_wh")
+         
+        # Check if slice params exist separately in config (endpoints might pass them differently)
+        if not slice_wh:
+            sw = config.get("slice_width")
+            sh = config.get("slice_height")
+            if sw and sh:
+                slice_wh = (int(sw), int(sh))
+        
+        if not overlap_wh:
+            # Try ratio first
+            ow_r = config.get("overlap_width_ratio")
+            oh_r = config.get("overlap_height_ratio")
+            if ow_r and oh_r and slice_wh:
+                overlap_wh = (int(slice_wh[0] * ow_r), int(slice_wh[1] * oh_r))
+        
+        slices = 1
+        if slice_wh and overlap_wh:
+             slices = calculate_slices((w, h), slice_wh, overlap_wh)
+        
+        return {
+            "file_type": "image",
+            "resolution": (w, h),
+            "total_frames": 1,
+            "slices_per_frame": slices,
+            "total_inference_steps": slices
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+def estimate_video_complexity(video_path: str, config: dict) -> dict:
+    """
+    Estimate processing steps for a video.
+    """
+    try:
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+             return {"error": "Could not read video"}
+        
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        cap.release()
+        
+        duration = frame_count / fps if fps else 0
+        
+        slice_wh = config.get("slice_wh")
+        overlap_wh = config.get("overlap_wh")
+        
+        # Check if slice params exist separately
+        if not slice_wh:
+            sw = config.get("slice_width")
+            sh = config.get("slice_height")
+            if sw and sh:
+                slice_wh = (int(sw), int(sh))
+        
+        if not overlap_wh and slice_wh:
+            # Defaults if not provided but slicing requested? 
+            # Or assume no slicing if not provided.
+            # But usually this function is called when specific slicing is expected or just general estimate.
+            pass
+
+        # If we have slice config, calculate. Otherwise 1 slice (whole frame).
+        slices_per_frame = 1
+        if slice_wh and overlap_wh: # Only if explicitly slicing
+            slices_per_frame = calculate_slices((w, h), slice_wh, overlap_wh)
+        elif config.get("slice_width"): # Maybe passed as loose keys
+            sw = int(config.get("slice_width"))
+            sh = int(config.get("slice_height"))
+            ow = int(config.get("overlap_width", 0))
+            oh = int(config.get("overlap_height", 0))
+            slices_per_frame = calculate_slices((w, h), (sw, sh), (ow, oh))
+
+        total_steps = frame_count * slices_per_frame
+        
+        return {
+            "file_type": "video",
+            "resolution": (w, h),
+            "total_frames": frame_count,
+            "duration_seconds": round(duration, 2),
+            "fps": round(fps, 2),
+            "slices_per_frame": slices_per_frame,
+            "total_inference_steps": total_steps
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
 def convert_to_h264(input_path: str, output_path: str) -> bool:
     """Convert video to H.264 format for browser compatibility using ffmpeg"""
     try:
@@ -723,9 +861,12 @@ def test():
         #region_points=[(100, 100), (100, 500), (500, 500), (500, 100)],
     )
     
-    results = image_custom_classes("horse.png", config)
-    print(f'YOLOE: {results}')
+    # results = image_custom_classes("horse.png", config)
+    # print(f'YOLOE: {results}')
 
+
+    complexity = estimate_image_complexity("horse.png", config)
+    print(f'Complexity: {complexity}')
 
 if __name__ == "__main__":
     test()
