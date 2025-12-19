@@ -1,15 +1,14 @@
 import os
 import uuid
-from fastapi import File, UploadFile, Form, APIRouter, HTTPException
+from fastapi import File, UploadFile, Form, APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from typing import Optional, List, Tuple
 from pathlib import Path
+from job_store import create_job, get_job
 
-
-# Import your existing counting functions
-# Import your existing counting functions
-from functions import basic_count, sliced_count, video_count, sliced_video_count, video_polygon_cross_count, image_zone_count, image_custom_classes, video_custom_classes, estimate_image_complexity, estimate_video_complexity
+# Import only estimation functions here; actual processing is in worker.py
+from functions import estimate_image_complexity, estimate_video_complexity
 
 router = APIRouter()
 
@@ -31,16 +30,14 @@ def save_upload_file(upload_file: UploadFile, dest: Path) -> Path:
 
 @router.post("/basic-count")
 async def api_basic_count(
+    request: Request,
     file: UploadFile = File(...),
     model: Optional[str] = Form("yolo11n.pt"),
     conf_threshold: Optional[float] = Form(0.35),
     classes: Optional[str] = Form(None)
 ):
-
-    token = uuid.uuid4().hex
-
     file_id = str(uuid.uuid4())
-    ext = Path(file.filename).suffix.lower()  # ".jpg" or ".png" or ".mp4"
+    ext = Path(file.filename).suffix.lower()
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
@@ -53,25 +50,21 @@ async def api_basic_count(
         except:
             print(f"Failed to parse classes: {classes}")
 
-    counts, annotated_path = basic_count(str(filename), config={"model": model, "conf_threshold": conf_threshold, "classes": class_list})
+    config = {
+        "model": model,
+        "conf_threshold": conf_threshold,
+        "classes": class_list
+    }
+    
+    job_id = create_job("basic", str(filename), config)
+    request.app.state.queue.put(job_id)
 
-    # Move annotated image to RESULTS_DIR
-    annotated_file = RESULTS_DIR / f"{token}{ext}"
-    os.replace(annotated_path, annotated_file)
-
-    TOKENS[token] = annotated_file
-
-    print("RESPONSE DEBUG:", {
-        "counts": counts,
-        "url": f"/secure-results/{token}{ext}",
-        "file_type": "image"
-    })
-
-    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "image"})
+    return JSONResponse({"job_id": job_id, "status": "queued"})
 
 
 @router.post("/sliced-count")
 async def api_sliced_count(
+    request: Request,
     file: UploadFile = File(...),
     model: Optional[str] = Form("yolo11n.pt"),
     conf_threshold: Optional[float] = Form(0.35),
@@ -81,11 +74,8 @@ async def api_sliced_count(
     overlap_height_ratio: Optional[float] = Form(0.2),
     classes: Optional[str] = Form(None)
 ):
-
-    token = uuid.uuid4().hex
-
     file_id = str(uuid.uuid4())
-    ext = Path(file.filename).suffix.lower()  # ".jpg" or ".png" or ".mp4"
+    ext = Path(file.filename).suffix.lower()
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
@@ -98,7 +88,6 @@ async def api_sliced_count(
         except:
             print(f"Failed to parse classes: {classes}")
 
-    # Build config with slice parameters
     config = {
         "model": model,
         "conf_threshold": conf_threshold,
@@ -109,28 +98,22 @@ async def api_sliced_count(
         "classes": class_list
     }
 
-    counts, annotated_path = sliced_count(str(filename), config=config)
+    job_id = create_job("sliced", str(filename), config)
+    request.app.state.queue.put(job_id)
 
-    annotated_file = RESULTS_DIR / f"{token}{ext}"
-    os.replace(annotated_path, annotated_file)
-
-    TOKENS[token] = annotated_file
-
-    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "image"})
+    return JSONResponse({"job_id": job_id, "status": "queued"})
 
 
 @router.post("/video-count")
 async def api_video_count(
+    request: Request,
     file: UploadFile = File(...),
     model: Optional[str] = Form("yolo11n.pt"),
     conf_threshold: Optional[float] = Form(0.35),
     classes: Optional[str] = Form(None)
 ):
-
-    token = uuid.uuid4().hex
-
     file_id = str(uuid.uuid4())
-    ext = Path(file.filename).suffix.lower()  # ".jpg" or ".png" or ".mp4"
+    ext = Path(file.filename).suffix.lower()
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
@@ -143,26 +126,20 @@ async def api_video_count(
         except:
             print(f"Failed to parse classes: {classes}")
 
-    counts, annotated_path = video_count(str(filename), config={"model": model, "conf_threshold": conf_threshold, "classes": class_list})
+    config = {
+        "model": model,
+        "conf_threshold": conf_threshold,
+        "classes": class_list
+    }
 
-    annotated_file = RESULTS_DIR / f"{token}{ext}"
-    
-    # Check if the source file exists before moving
-    if not os.path.exists(annotated_path):
-        return JSONResponse({"error": f"Annotated file not found at {annotated_path}"}, status_code=500)
-        
-    os.replace(annotated_path, annotated_file)
-    
-    # Verify the file was actually moved
-    if not annotated_file.exists():
-        return JSONResponse({"error": f"Failed to move annotated file to results directory"}, status_code=500)
+    job_id = create_job("video", str(filename), config)
+    request.app.state.queue.put(job_id)
 
-    TOKENS[token] = annotated_file
-
-    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "video"})
+    return JSONResponse({"job_id": job_id, "status": "queued"})
 
 @router.post("/sliced-video-count")
 async def api_sliced_video_count(
+    request: Request,
     file: UploadFile = File(...),
     model: Optional[str] = Form("yolo11n.pt"),
     conf_threshold: Optional[float] = Form(0.35),
@@ -172,11 +149,8 @@ async def api_sliced_video_count(
     overlap_height: Optional[int] = Form(10),
     classes: Optional[str] = Form(None)
 ):
-
-    token = uuid.uuid4().hex
-
     file_id = str(uuid.uuid4())
-    ext = Path(file.filename).suffix.lower()  # ".jpg" or ".png" or ".mp4"
+    ext = Path(file.filename).suffix.lower()
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
@@ -189,7 +163,6 @@ async def api_sliced_video_count(
         except:
             print(f"Failed to parse classes: {classes}")
 
-    # Build config with slice parameters
     config = {
         "model": model,
         "conf_threshold": conf_threshold,
@@ -198,28 +171,23 @@ async def api_sliced_video_count(
         "classes": class_list
     }
 
-    counts, annotated_path = sliced_video_count(str(filename), config=config)
+    job_id = create_job("sliced_video", str(filename), config)
+    request.app.state.queue.put(job_id)
 
-    annotated_file = RESULTS_DIR / f"{token}{ext}"
-    os.replace(annotated_path, annotated_file)
-
-    TOKENS[token] = annotated_file
-
-    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "video"})
+    return JSONResponse({"job_id": job_id, "status": "queued"})
 
 from pydantic import Json
 import json
 
 @router.post("/polygon-cross-count")
 async def api_polygon_cross_count(
+    request: Request,
     file: UploadFile = File(...),
     model: Optional[str] = Form("yolo11n.pt"),
     conf_threshold: Optional[float] = Form(0.35),
     region_points: Optional[str] = Form("[(300, 100), (300, 1200)]"),
     classes: Optional[str] = Form(None)
 ):
-    token = uuid.uuid4().hex
-
     file_id = str(uuid.uuid4())
     ext = Path(file.filename).suffix.lower()
     filename = UPLOAD_DIR / f"{file_id}{ext}"
@@ -227,13 +195,11 @@ async def api_polygon_cross_count(
 
     # Parse region points string to list
     try:
-        # Handling both JSON style [[x,y], [x,y]] and Python style [(x,y), (x,y)]
         import ast
         points = ast.literal_eval(region_points)
         if not isinstance(points, (list, tuple)):
             raise ValueError
     except:
-        # Fallback default if parsing fails
         points = [(0, 0), (100, 100)] 
         print(f"Failed to parse region points: {region_points}, using default.")
 
@@ -246,7 +212,6 @@ async def api_polygon_cross_count(
         except:
             print(f"Failed to parse classes: {classes}")
 
-    # Build config with region points
     config = {
         "model": model,
         "conf_threshold": conf_threshold,
@@ -254,21 +219,10 @@ async def api_polygon_cross_count(
         "classes": class_list
     }
 
-    counts, annotated_path = video_polygon_cross_count(str(filename), config=config)
+    job_id = create_job("polygon_cross_count", str(filename), config)
+    request.app.state.queue.put(job_id)
 
-    annotated_file = RESULTS_DIR / f"{token}{ext}"
-    
-    # Ensure source file exists (it could be .mp4 or .avi, etc) - wait, video_polygon_cross_count returns the path
-    # If using convert_to_h264, the path might be different. Let's just trust the return value.
-    if Path(annotated_path).exists():
-        os.replace(annotated_path, annotated_file)
-    else:
-        # If the file wasn't created, we might have an issue
-        return JSONResponse({"error": "Processing failed"}, status_code=500)
-
-    TOKENS[token] = annotated_file
-
-    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "video"})
+    return JSONResponse({"job_id": job_id, "status": "queued"})
 
 
 
@@ -277,14 +231,13 @@ async def api_polygon_cross_count(
 
 @router.post("/image-zone-count")
 async def api_image_zone_count(
+    request: Request,
     file: UploadFile = File(...),
     model: Optional[str] = Form("yolo11n.pt"),
     conf_threshold: Optional[float] = Form(0.35),
     region_points: Optional[str] = Form("[(50, 50), (250, 50), (250, 250), (50, 250)]"),
     classes: Optional[str] = Form(None)
 ):
-    token = uuid.uuid4().hex
-
     file_id = str(uuid.uuid4())
     ext = Path(file.filename).suffix.lower()
     filename = UPLOAD_DIR / f"{file_id}{ext}"
@@ -309,7 +262,6 @@ async def api_image_zone_count(
         except:
             print(f"Failed to parse classes: {classes}")
 
-    # Build config
     config = {
         "model": model,
         "conf_threshold": conf_threshold,
@@ -317,14 +269,10 @@ async def api_image_zone_count(
         "classes": class_list
     }
 
-    counts, annotated_path = image_zone_count(str(filename), config=config)
+    job_id = create_job("image_zone_count", str(filename), config)
+    request.app.state.queue.put(job_id)
 
-    annotated_file = RESULTS_DIR / f"{token}{ext}"
-    os.replace(annotated_path, annotated_file)
-
-    TOKENS[token] = annotated_file
-
-    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "image"})
+    return JSONResponse({"job_id": job_id, "status": "queued"})
 
 @router.get("/secure-results/{filename}")
 async def secure_image(filename: str):
@@ -349,25 +297,22 @@ async def get_result_file(filename: str):
 
 @router.post("/image-custom-count")
 async def api_image_custom_count(
+    request: Request,
     file: UploadFile = File(...),
     model: Optional[str] = Form("yolov8s-world.pt"),
     conf_threshold: Optional[float] = Form(0.20),
     classes: Optional[str] = Form(None)
 ):
-    token = uuid.uuid4().hex
     file_id = str(uuid.uuid4())
     ext = Path(file.filename).suffix.lower()
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
-    # Parse classes (expecting comma-separated strings for YOLOWorld)
     class_list = []
     if classes:
-        # Split by comma and strip whitespace
         class_list = [c.strip() for c in classes.split(",") if c.strip()]
-    
     if not class_list:
-        class_list = ["person"] # Default fallback
+        class_list = ["person"]
 
     config = {
         "model": model,
@@ -375,36 +320,30 @@ async def api_image_custom_count(
         "classes": class_list
     }
 
-    counts, annotated_path = image_custom_classes(str(filename), config=config)
+    job_id = create_job("image_custom", str(filename), config)
+    request.app.state.queue.put(job_id)
 
-    annotated_file = RESULTS_DIR / f"{token}{ext}"
-    os.replace(annotated_path, annotated_file)
-    TOKENS[token] = annotated_file
-
-    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "image"})
+    return JSONResponse({"job_id": job_id, "status": "queued"})
 
 
 @router.post("/video-custom-count")
 async def api_video_custom_count(
+    request: Request,
     file: UploadFile = File(...),
     model: Optional[str] = Form("yolov8s-world.pt"),
     conf_threshold: Optional[float] = Form(0.20),
     classes: Optional[str] = Form(None)
 ):
-    token = uuid.uuid4().hex
     file_id = str(uuid.uuid4())
     ext = Path(file.filename).suffix.lower()
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
-    # Parse classes (expecting comma-separated strings for YOLOWorld)
     class_list = []
     if classes:
-        # Split by comma and strip whitespace
         class_list = [c.strip() for c in classes.split(",") if c.strip()]
-
     if not class_list:
-        class_list = ["person"] # Default fallback
+        class_list = ["person"]
 
     config = {
         "model": model,
@@ -412,18 +351,30 @@ async def api_video_custom_count(
         "classes": class_list
     }
 
-    counts, annotated_path = video_custom_classes(str(filename), config=config)
+    job_id = create_job("video_custom", str(filename), config)
+    request.app.state.queue.put(job_id)
 
-    annotated_file = RESULTS_DIR / f"{token}{ext}"
+    return JSONResponse({"job_id": job_id, "status": "queued"})
+
+
+@router.get("/jobs/{job_id}")
+async def get_job_status(job_id: str):
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    response = {
+        "id": job["id"],
+        "status": job["status"],
+        "created_at": job["created_at"],
+        "error": job["error"]
+    }
     
-    if Path(annotated_path).exists():
-        os.replace(annotated_path, annotated_file)
-    else:
-        return JSONResponse({"error": "Processing failed"}, status_code=500)
-
-    TOKENS[token] = annotated_file
-
-    return JSONResponse({"counts": counts, "annotated_file": f"/secure-results/{token}{ext}", "file_type": "video"})
+    if job["result"]:
+        import json
+        response["result"] = json.loads(job["result"])
+        
+    return response
 
 @router.post("/estimate-count")
 async def api_estimate_count(

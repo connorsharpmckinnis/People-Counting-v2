@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir git+https://github.com/ultralytics/CLIP.git
 
 # Copy the rest of the project
-COPY main.py endpoints.py functions.py /app/
+COPY main.py endpoints.py functions.py job_store.py jobs.db worker.py /app/
 COPY static /app/static
 
 # Create folders in case they don’t already exist

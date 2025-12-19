@@ -420,42 +420,92 @@ form.addEventListener("submit", async (e) => {
 
         const data = await response.json();
 
-        // Format the counts nicely
-        if (Object.keys(data.counts).length === 0) {
-            resultsEl.textContent = "No objects detected";
-        } else {
-            resultsEl.textContent = JSON.stringify(data.counts, null, 2);
+        // Handle job queue response
+        if (data.job_id) {
+            resultsEl.textContent = "Job submitted! Waiting in queue...";
+            pollJobStatus(data.job_id);
+        } else if (data.counts) {
+            // Fallback for immediate response (though we shouldn't have any anymore)
+            displayResults(data);
         }
-
-        // Show the appropriate media
-        if (data.file_type === "image") {
-            imgEl.src = data.annotated_file;
-            imgEl.style.display = "block";
-            videoEl.style.display = "none";
-        } else if (data.file_type === "video") {
-            videoEl.src = data.annotated_file;
-            videoEl.load();
-            videoEl.style.display = "block";
-            imgEl.style.display = "none";
-        }
-
-        // Show download button
-        downloadBtn.href = data.annotated_file;
-        downloadBtn.style.display = "inline-block";
-
-        // Scroll to results
-        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     } catch (error) {
-        resultsEl.textContent = `❌ Error: ${error.message}\n\nPlease check:\n- File format is supported\n- Server is running\n- File size is reasonable`;
+        resultsEl.textContent = `❌ Error: ${error.message}`;
         resultsEl.style.color = "#d63031";
-    } finally {
-        // Reset button state
-        btnText.style.display = "inline";
-        btnLoader.style.display = "none";
-        form.querySelector(".submit-btn").disabled = false;
+        resetBtnState();
     }
 });
+
+function resetBtnState() {
+    btnText.style.display = "inline";
+    btnLoader.style.display = "none";
+    form.querySelector(".submit-btn").disabled = false;
+}
+
+async function pollJobStatus(jobId) {
+    try {
+        const response = await fetch(`/jobs/${jobId}`);
+        if (!response.ok) throw new Error("Failed to poll status");
+
+        const job = await response.json();
+
+        if (job.status === "completed") {
+            displayResults(job.result);
+            resetBtnState();
+        } else if (job.status === "failed") {
+            resultsEl.textContent = `❌ Job Failed: ${job.error}`;
+            resultsEl.style.color = "#d63031";
+            resetBtnState();
+        } else {
+            // Still running or queued
+            if (job.status === "queued") {
+                resultsEl.textContent = "⏳ Job is queued...";
+                resultsEl.style.color = "#0984e3";
+            } else if (job.status === "processing") {
+                resultsEl.textContent = "⚙️ Processing... This may take a moment.";
+                resultsEl.style.color = "#e17055";
+            }
+
+            // Poll again in 2 seconds
+            setTimeout(() => pollJobStatus(jobId), 2000);
+        }
+
+    } catch (e) {
+        console.error("Polling error:", e);
+        resultsEl.textContent = "Error checking job status.";
+        resetBtnState();
+    }
+}
+
+function displayResults(data) {
+    // Format the counts nicely
+    if (Object.keys(data.counts).length === 0) {
+        resultsEl.textContent = "No objects detected";
+        resultsEl.style.color = "var(--text-primary)";
+    } else {
+        resultsEl.textContent = JSON.stringify(data.counts, null, 2);
+        resultsEl.style.color = "var(--text-primary)";
+    }
+
+    // Show the appropriate media
+    if (data.file_type === "image") {
+        imgEl.src = data.annotated_file;
+        imgEl.style.display = "block";
+        videoEl.style.display = "none";
+    } else if (data.file_type === "video") {
+        videoEl.src = data.annotated_file;
+        videoEl.load();
+        videoEl.style.display = "block";
+        imgEl.style.display = "none";
+    }
+
+    // Show download button
+    downloadBtn.href = data.annotated_file;
+    downloadBtn.style.display = "inline-block";
+
+    // Scroll to results
+    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
 
 // --- ESTIMATION LOGIC ---
 const estimationSection = document.getElementById("estimationSection");
