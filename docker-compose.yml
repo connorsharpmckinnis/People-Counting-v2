@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  detection-engine:
+    # Build from the Dockerfile in this directory
+    build: .
+    
+    # Container name for easy reference
+    container_name: detection-engine
+    
+    # Environment variables
+    # You can also use an .env file alongside this compose file
+    environment:
+      - APP_PASSWORD=${APP_PASSWORD}
+      - NUM_WORKERS=3
+    
+    # Persist data across container restarts
+    volumes:
+      - ./data:/app/data         # jobs.db lives here
+      - ./results:/app/results   # Annotated output files
+      - ./uploads:/app/uploads   # Temporary uploaded files
+    
+    # Expose the port
+    ports:
+      - "8000:8000"
+    
+    # Restart if it crashes
+    restart: unless-stopped

@@ -12,6 +12,11 @@ from endpoints import router
 from job_store import init_db
 from worker import worker_loop
 
+APP_PASSWORD = os.getenv("APP_PASSWORD")
+#verify that APP_PASSWORD is set
+if not APP_PASSWORD:
+    raise ValueError("APP_PASSWORD environment variable is not set")
+
 # Initialize DB on import (or startup)
 init_db()
 
@@ -41,7 +46,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 security = HTTPBasic()
 
-APP_PASSWORD = os.getenv("APP_PASSWORD")
+
 
 def check_password(credentials: HTTPBasicCredentials = Depends(security)):
     correct_password = APP_PASSWORD

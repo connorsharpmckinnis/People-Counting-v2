@@ -4,7 +4,10 @@ import uuid
 import os
 from datetime import datetime
 
-DB_PATH = "jobs.db"
+# Store in /app/data so it can be mounted as a volume
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+DB_PATH = os.path.join(DATA_DIR, "jobs.db")
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
