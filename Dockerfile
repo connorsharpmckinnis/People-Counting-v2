@@ -26,11 +26,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir git+https://github.com/ultralytics/CLIP.git
 
 # Copy the rest of the project
-COPY main.py endpoints.py functions.py job_store.py jobs.db worker.py /app/
+COPY main.py endpoints.py functions.py job_store.py worker.py /app/
 COPY static /app/static
 
-# Create folders in case they don’t already exist
-RUN mkdir -p /app/uploads /app/results
+# Create a non-root user for security
+RUN useradd --create-home appuser
+
+# Create folders in case they don't already exist
+RUN mkdir -p /app/uploads /app/results /app/data && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
 
 # Expose FastAPI port
 EXPOSE 8000
