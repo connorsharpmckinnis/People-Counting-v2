@@ -4,6 +4,7 @@ services:
   detection-engine:
     # Build from the Dockerfile in this directory
     build: .
+    image: connorsharpmckinnis/detection-engine:0.9
     
     # Container name for easy reference
     container_name: detection-engine
@@ -11,7 +12,7 @@ services:
     # Environment variables
     # You can also use an .env file alongside this compose file
     environment:
-      - APP_PASSWORD=${APP_PASSWORD}
+      - APP_PASSWORD=apex123
       - NUM_WORKERS=3
     
     # Persist data across container restarts
