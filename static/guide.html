@@ -12,245 +12,217 @@
 
 <body>
     <div class="container">
-        <header>
-            <h1>System User Guide</h1>
-            <p class="subtitle">Welcome to Detection Engine 101</p>
-            <div style="margin-top: 15px;">
-                <a href="/"
-                    style="display: inline-block; background-color: rgba(255,255,255,0.2); color: white; text-decoration: none; font-weight: 600; padding: 8px 16px; border-radius: 20px; font-size: 1.3rem; border: 1px solid rgba(255,255,255,0.4); transition: all 0.2s;">
-                    ← Back to Engine
+        <div class="hero-guide">
+            <h1 style="color: white;">Detection Engine Guide</h1>
+            <p class="subtitle" style="color: white;">A guide to mastering object detection and
+                tracking workflows.</p>
+            <div style="margin-top: 2rem;">
+                <a href="/" class="btn btn-primary"
+                    style="padding: 12px 24px; font-size: 1.1rem; background-color: white; color: #2d3436; text-decoration: none; font-weight: 600;">
+                    🚀 Back to Engine
                 </a>
             </div>
-        </header>
-
-        <!-- Section 0: Disclaimers and Warnings -->
-        <div class="info-card">
-            <h2>Important Notes & Expectations</h2>
-            <p><strong>About Accuracy:</strong> This system provides best-effort detection results based on statistical
-                models. While it can be very useful, it isn’t perfect. Results should always be reviewed by a human and
-                used as guidance—not as absolute truth for critical decisions.</p>
-            <p><strong>System Status:</strong> The Detection Engine is provided “as-is.” Like any evolving technology,
-                it may contain bugs or edge cases that haven’t yet been identified. Please use it thoughtfully and
-                report issues when you encounter them.</p>
-            <p><strong>Ongoing Improvements:</strong> The interface and workflows are actively being refined. Some areas
-                may feel rough around the edges, but improvements are ongoing as I learn from real-world use.</p>
-            <p><strong>Using Results Responsibly:</strong> Detection outputs should be interpreted in context. When
-                results matter operationally, take time to validate findings and cross-check with other sources.</p>
         </div>
 
+        <!-- Quick Start -->
+        <section>
+            <h2 style="color: white; margin-bottom: 2rem; text-align: center;">Getting Started in 3 Steps</h2>
+            <div class="quick-start">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h3>Upload & Configure</h3>
+                    <p>Select your image or video and choose the <strong>Processing Mode</strong>. For best results, use
+                        standard resolutions and common formats (MP4, MOV, JPG, PNG).</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h3>Tune the AI</h3>
+                    <p>Select a <strong>Model</strong> size (Nano for speed, Large for accuracy) and set a
+                        <strong>Confidence Threshold</strong>. 0.35 is usually the "sweet spot".
+                    </p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h3>Queue Job</h3>
+                    <p>Submit your request. Large videos are processed in the background. You can check the <strong>Job
+                            History</strong> at the bottom of the main page to see progress.</p>
+                </div>
+            </div>
+        </section>
 
-        <!-- Section 1: Choosing Mode -->
+        <!-- Choosing Mode -->
         <div class="info-card">
-            <h2>Choosing the Right Processing Mode</h2>
-            <p style="margin-bottom: 20px;">The system offers several ways to process your files. Choosing the right one
-                is key to getting accurate results.</p>
+            <h2>Deep Dive: Choosing a Processing Mode</h2>
+            <p>Selecting the correct mode is the single most important factor for success.</p>
 
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <table class="mode-table">
                 <thead>
-                    <tr style="background-color: #f1f2f6;">
-                        <th style="padding: 12px; border: 1px solid #dfe6e9; color: #2d3436; text-align: left;">Mode
-                        </th>
-                        <th style="padding: 12px; border: 1px solid #dfe6e9; color: #2d3436; text-align: left;">Best
-                            Used For...</th>
-                        <th style="padding: 12px; border: 1px solid #dfe6e9; color: #2d3436; text-align: left;">Pros &
-                            Cons</th>
+                    <tr>
+                        <th style="width: 25%;">Processing Mode</th>
+                        <th style="width: 40%;">Best Suited For...</th>
+                        <th>Characteristics</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;"><strong>Basic Image</strong></td>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;">General photos, street scenes, large
-                            objects.</td>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;">✅ Fastest<br>❌ Misses tiny objects</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;"><strong>Sliced Image (SAHI)</strong></td>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;">Aerial/Drone imagery, high-res maps,
-                            crowds.</td>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;">✅ Detects tiny objects accurately<br>❌
-                            4-10x slower than basic</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;"><strong>Basic Video</strong></td>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;">Surveillance, standard angles.</td>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;">✅ Smooth tracking<br>❌ struggles with very
-                            small objects</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;"><strong>Sliced Video</strong></td>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;">Drone video, high-altitude surveillance.
+                        <td><strong>Basic Image / Video</strong></td>
+                        <td>Street photography, security cameras, other normal-sized imagery</td>
+                        <td>
+                            <span class="tag tag-fast">Very Fast</span>
+                            <p style="margin-top: 0.5rem; font-size: 0.85rem;">Scans the whole frame at once. Best for
+                                when objects are large and clearly visible.</p>
                         </td>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;">✅ Maximum accuracy for small details<br>❌
-                            Very slow processing</td>
                     </tr>
                     <tr>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;"><strong>Polygon/Zone</strong></td>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;">Specific area counting (e.g., sidewalk
-                            only).</td>
-                        <td style="padding: 12px; border: 1px solid #dfe6e9;">✅ Ignores background clutter<br>❌ Requires
-                            manual setup</td>
+                        <td><strong>Sliced (SAHI)</strong></td>
+                        <td>Drone/Aerial imagery, satellite photos, or 4K/8K landscape images with many tiny
+                            objects.</td>
+                        <td>
+                            <span class="tag tag-slow">Intensive</span>
+                            <p style="margin-top: 0.5rem; font-size: 0.85rem;">Tiles the image to find tiny details. 10x
+                                more accuracy for small dots, but takes longer.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Polygon / Zone</strong></td>
+                        <td>Counting people on a specific sidewalk, cars at an intersection, or objects entering a shop
+                            entrance.</td>
+                        <td>
+                            <span class="tag tag-balanced">Precise</span>
+                            <p style="margin-top: 0.5rem; font-size: 0.85rem;">User-defined shapes. Only counts unique
+                                items that pass through or reside in your drawn zones.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Custom Classes</strong></td>
+                        <td>Specific focus tasks where you only care about certain things (e.g. "Only show me Trucks and
+                            Bicycles").</td>
+                        <td>
+                            <span class="tag tag-balanced">Focused</span>
+                            <p style="margin-top: 0.5rem; font-size: 0.85rem;">Filters out the noise. Uses advanced
+                                prompt-based logic to isolate exactly what you're looking for.</p>
+                        </td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
-        <!-- Section 2: Model & Confidence -->
-        <div class="info-card">
-            <h2>Tuning the AI (Model & Confidence)</h2>
-
-            <div class="guide-grid" style="margin-top: 20px;">
-                <div class="guide-item">
-                    <strong>Choose Your Model</strong>
-                    <ul style="list-style: none; padding: 0; margin-top: 10px;">
-                        <li style="margin-bottom: 10px;"><strong>⚡ Nano (yolo11n.pt)</strong>Fastest. Good for
-                            distinct objects.</li>
-                        <li style="margin-bottom: 10px;"><strong>⚖️ Medium (yolo11m.pt)</strong>Balanced. Recommended
-                            default.</li>
-                        <li><strong>🧠 Extra Large (yolo11x.pt)</strong>Smartest. Use for difficult detections.</li>
-                    </ul>
+        <!-- Decision Tree Callout -->
+        <div class="decision-box">
+            <h3>Quick Selection Guide</h3>
+            <div class="decision-option">
+                <div class="decision-icon">🛸</div>
+                <div>
+                    <strong>"I have drone footage and I need to count people or cars from 200ft up."</strong><br>
+                    <small>Use <strong>Sliced Video</strong> with the <strong>Aerial Nano</strong> model.</small>
                 </div>
-
-                <div class="guide-item">
-                    <strong>Confidence Threshold</strong>
-                    <p style="margin: 10px 0;">Controls detection detection sensitivity (0.0 - 1.0).</p>
-                    <ul style="list-style: none; padding: 0;">
-                        <li style="margin-bottom: 5px;"><strong>🎯 Default (0.35)</strong>Good balance.</li>
-                        <li style="margin-bottom: 5px;"><strong>📉 Lower (< 0.25)</strong>Catches more, but more false
-                                    positives.</li>
-                        <li><strong>📈 Higher (> 0.60)</strong>Fewer false positives, might miss real objects.</li>
-                    </ul>
+            </div>
+            <div class="decision-option">
+                <div class="decision-icon">📹</div>
+                <div>
+                    <strong>"I need to know how many people walked into this building today."</strong><br>
+                    <small>Use <strong>Polygon Crossing</strong>. Draw a box over the door.</small>
+                </div>
+            </div>
+            <div class="decision-option">
+                <div class="decision-icon">📸</div>
+                <div>
+                    <strong>"I just want to see what's in this random photo."</strong><br>
+                    <small>Use <strong>Basic Image</strong> with <strong>Medium</strong> model.</small>
                 </div>
             </div>
         </div>
 
-        <!-- Section 3: Slicing -->
-        <div class="info-card">
-            <h2>Understanding Slicing (SAHI)</h2>
-            <p>For drone footage or 4K/8K images where objects are tiny dots. Slicing chops the image into tiles, zooms
-                in, finds objects, and stitches them back.</p>
+        <!-- Advanced Features -->
+        <div class="guide-grid">
+            <div class="info-card" style="margin-bottom: 0;">
+                <h2>Model Anatomy</h2>
+                <div class="guide-item" style="margin-bottom: 1rem;">
+                    <strong>⚡ Nano</strong>
+                    <p>Extremely fast. Use for real-time needs or very simple scenes. Good for processing videos.</p>
+                </div>
+                <div class="guide-item" style="margin-bottom: 1rem;">
+                    <strong>⚖️ Medium</strong>
+                    <p>The "Goldilocks" model. Excellent balance of speed and intelligence. Most users should start
+                        here.</p>
+                </div>
+                <div class="guide-item">
+                    <strong>🧠 Extra Large</strong>
+                    <p>Heaviest processing. Used for difficult angles, blurred objects, or complex overlapping crowds.
+                    </p>
+                </div>
+            </div>
 
-            <div
-                style="background: #f1f2f6; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid var(--primary-color);">
-                <h3 style="margin-bottom: 10px; color: #2d3436; font-size: 1.1rem;">Key Settings</h3>
-                <ul style="margin-left: 20px; color: var(--text-secondary);">
-                    <li style="margin-bottom: 8px;"><strong>Slice Width/Height</strong>: Keeping this small (e.g.,
-                        <code>256</code> or <code>512</code>) makes the AI "zoom in" more. Smaller = catch tinier
-                        objects, but slower processing.
-                    </li>
-                    <li><strong>Overlap Ratio</strong>: (e.g., <code>0.2</code>). Ensures objects on the edge of a tile
-                        aren't cut in half and missed.</li>
-                </ul>
+            <div class="info-card" style="margin-bottom: 0;">
+                <h2>Pro-User Tips</h2>
+                <div class="callout callout-info" style="margin-top: 0;">
+                    <span class="callout-icon">💡</span>
+                    <div>
+                        <strong>Custom Models</strong><br>
+                        Drop any <code>.pt</code> file into the <code>/models</code> directory on the server to use your
+                        own custom-trained YOLO models.
+                    </div>
+                </div>
+                <div class="callout callout-warning">
+                    <span class="callout-icon">⚠️</span>
+                    <div>
+                        <strong>Video Timeouts</strong><br>
+                        Large images (in sliced mode) and videos may experience upload delays. We recommend trimming
+                        long videos into 30-60
+                        second clips before processing. For all large files, be patient while it processes.
+                    </div>
+                </div>
+                <div class="callout callout-danger">
+                    <span class="callout-icon">🛑</span>
+                    <div>
+                        <strong>Memory Usage</strong><br>
+                        Running <em>Sliced Video</em> on 4K files with <em>Extra Large</em> models requires significant
+                        GPU memory and will take a long time to process.
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Section 4: Expectations -->
-        <div class="info-card">
-            <h2>Performance Expectations</h2>
-            <p style="margin-bottom: 15px;">Timings vary based on hardware (GPU vs CPU), the model used, and the size of
-                the file being processed.</p>
-
-            <ul style="margin-left: 20px; margin-bottom: 20px;">
-                <li style="margin-bottom: 5px;"><strong>Images</strong>: 1-5 seconds. (Sliced: 10-30s)</li>
-                <li style="margin-bottom: 5px;"><strong>Standard Video</strong>: ~2-5 minutes per minute of video.
-                    Consider taking timelapses to cover more temporal ground.</li>
-                <li><strong>Sliced Video</strong>: <strong>Heavy computation.</strong> Can take 10x video duration.
-                    Remember, it's running dozens of smaller detection processes on every frame.</li>
-            </ul>
-
-            <div
-                style="background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; border: 1px solid #ffeeba;">
-                ⚠️ <strong>Note:</strong> The interface might look "stuck" on large video files. Check the server
-                console log if you have access!
+        <!-- Troubleshooting & FAQ -->
+        <div class="info-card" style="margin-top: 2rem;">
+            <h2>Common Questions (FAQ)</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                <div>
+                    <h4 style="margin-bottom: 0.5rem; color: var(--text-primary);">Why is my count different
+                        frame-by-frame?</h4>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary);">AI models make statistical guesses. If
+                        an object is momentarily blocked by a tree or pole, the "tracking" might break. Take all counts
+                        with a grain of salt.</p>
+                </div>
+                <div>
+                    <h4 style="margin-bottom: 0.5rem; color: var(--text-primary);">What does 'Confidence' actually do?
+                    </h4>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary);">It's a "Don't show me unless you are X%
+                        sure" filter. Setting it too low (0.1) shows everything but creates ghosts. Setting it too high
+                        (0.8) only shows things that are indisputably clear.</p>
+                </div>
+                <div>
+                    <h4 style="margin-bottom: 0.5rem; color: var(--text-primary);">Can I draw multiple polygons?</h4>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary);">Yes! Draw your first shape, click
+                        "Finish & Start New Region", and repeat. The system will track statistics for each region
+                        independently.</p>
+                </div>
+                <div>
+                    <h4 style="margin-bottom: 0.5rem; color: var(--text-primary);">Why is 'Sliced' so much slower?</h4>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary);">Because 'Sliced' might run the AI model
+                        10-20 times per frame instead of once. It's doing a lot more work to find those tiny details.
+                    </p>
+                </div>
             </div>
         </div>
 
-        <!-- Section 5: Troubleshooting -->
-        <div class="info-card">
-            <h2>Quick Troubleshooting</h2>
-            <ul style="margin-left: 20px;">
-                <li style="margin-bottom: 10px;"><strong>"Server Error" on Upload?</strong> Video might be too large for
-                    server memory. Try a shorter clip.</li>
-                <li style="margin-bottom: 10px;"><strong>Video won't play?</strong> We convert to H.264 automatically,
-                    but stick to <code>.mp4</code> or <code>.mov</code> inputs.</li>
-                <li><strong>Wrong Objects?</strong> Use "Classes to Detect". Enter <code>2</code> for cars,
-                    <code>0</code> for persons.
-                </li>
-            </ul>
-        </div>
-
-        <!-- Section 6: Common Classes -->
-        <div class="info-card">
-            <h2>Common Classes</h2>
-            <p style="margin-bottom: 15px;">Below are some common object classes and their corresponding IDs for
-                detection.</p>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                <thead>
-                    <tr style="background-color: #f2f2f2;">
-                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Name</th>
-                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Class ID</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">person</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">0</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">bicycle</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">1</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">car</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">2</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">motorcycle</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">3</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">airplane</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">4</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">bus</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">5</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">train</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">6</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">truck</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">7</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">boat</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">8</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">traffic light</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">9</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">fire hydrant</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">10</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">stop sign</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">11</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">parking meter</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">12</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">bench</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">13</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
+        <!-- Disclaimers -->
+        <footer
+            style="text-align: center; color: rgba(255,255,255,0.7); margin-top: 4rem; padding-bottom: 4rem; font-size: 0.9rem;">
+            <p>Detection Engine is an evolving tool. Always validate AI-generated statistics for critical operational
+                needs.</p>
+            <p style="margin-top: 10px;">&copy; 2024 Town of Apex Detection Engine</p>
+        </footer>
     </div>
 </body>
 
