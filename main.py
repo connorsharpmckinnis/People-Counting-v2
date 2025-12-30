@@ -7,10 +7,17 @@ import secrets
 import os
 import multiprocessing
 import contextlib
+import torch
 
 from endpoints import router
 from job_store import init_db
 from worker import worker_loop
+import logging
+
+multiprocessing.set_start_method("spawn", force=True)
+
+logging.info("CUDA available: %s", torch.cuda.is_available())
+
 
 APP_PASSWORD = os.getenv("APP_PASSWORD")
 #verify that APP_PASSWORD is set

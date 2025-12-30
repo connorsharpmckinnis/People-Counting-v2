@@ -73,7 +73,7 @@
                         <option value="yolo11m.pt">Medium</option>
                         <option value="yolo11l.pt">Large</option>
                         <option value="yolo11x.pt">Extra Large (Most Accurate)</option>
-                        <option value="yolo11n_drone.pt">People Only (Best with Aerial Crowds)</option>
+                        <option value="yolo11n_drone.pt">Aerial Nano (best for aerials and crowds)</option>
                         <option value="yoloe-11s-seg.pt">YOLOE (Custom Classes)</option>
                     </select>
                 </div>
@@ -221,10 +221,23 @@
             <!-- Polygon Cross Count Video Settings -->
             <div id="polygonCrossCountSettings" class="advanced-settings" style="display:none;">
                 <h3>Polygon Cross Count Settings</h3>
-                <p class="settings-description">Define a polygonal region to count objects crossing it</p>
+                <p class="settings-description">Define polygonal regions or lines to count objects crossing them</p>
+
+                <!-- Instructions Callout -->
+                <div
+                    style="background: linear-gradient(135deg, #74b9ff, #0984e3); color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <strong style="font-size: 1.1em;">📝 Drawing Instructions:</strong>
+                    <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
+                        <li><strong>Click</strong> to add points to your current polygon/line</li>
+                        <li>Click <strong>"Finish & Start New"</strong> to complete the current shape and begin another
+                        </li>
+                        <li>Draw <strong>2 points</strong> for a line, or <strong>3+ points</strong> for a polygon</li>
+                        <li>Each region will be shown in a <strong>different color</strong></li>
+                    </ul>
+                </div>
 
                 <div class="form-group">
-                    <label>Draw Region on Frame</label>
+                    <label>Draw Regions on Frame</label>
                     <div class="canvas-container"
                         style="position: relative; width: 100%; max-width: 800px; margin-bottom: 10px;">
                         <canvas id="regionCanvas"
@@ -234,18 +247,27 @@
                             Select a video to verify frame dimensions and draw markings
                         </div>
                     </div>
-                    <button type="button" id="clearPointsBtn"
-                        style="padding: 5px 10px; font-size: 0.8rem; background: #636e72; color: white; border: none; border-radius: 4px; cursor: pointer;">Clear
-                        Points</button>
-                    <small style="display: block; margin-top: 5px; color: #666;">Points: <span
-                            id="pointCount">0</span></small>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;">
+                        <button type="button" id="finishVideoRegionBtn"
+                            style="padding: 8px 16px; font-size: 0.9rem; background: #00b894; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                            ✓ Finish & Start New Region
+                        </button>
+                        <button type="button" id="clearPointsBtn"
+                            style="padding: 8px 16px; font-size: 0.9rem; background: #636e72; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            🗑️ Clear All Regions
+                        </button>
+                    </div>
+                    <small style="display: block; color: #666;">
+                        <span id="pointCount">0 pts / 0 complete</span> —
+                        <em>Dashed lines = in-progress, solid = complete</em>
+                    </small>
                 </div>
 
                 <div class="form-group">
                     <label for="regionPoints">
                         Region Points (Line or Polygon)
                         <span class="tooltip"
-                            data-tooltip="Format: [(x1,y1), (x2,y2)] or [(x1,y1), ..., (x4,y4)]. Default is a vertical line.">ℹ️</span>
+                            data-tooltip="Single region: [(x1,y1), ...]. Multiple regions: {'region-01': [...], 'region-02': [...]}">ℹ️</span>
                     </label>
                     <input type="text" name="region_points" id="regionPoints" placeholder="[(300, 100), (300, 1200)]"
                         readonly style="background: #f9f9f9; cursor: not-allowed;">
@@ -255,31 +277,53 @@
             <!-- Image Zone Counting Settings -->
             <div id="imageZoneSettings" class="advanced-settings" style="display:none;">
                 <h3>Image Zone Settings</h3>
-                <p class="settings-description">Draw a polygon zone on the image to count objects within it.</p>
+                <p class="settings-description">Draw polygon zones on the image to count objects within them.</p>
+
+                <!-- Instructions Callout -->
+                <div
+                    style="background: linear-gradient(135deg, #a29bfe, #6c5ce7); color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <strong style="font-size: 1.1em;">📝 Drawing Instructions:</strong>
+                    <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
+                        <li><strong>Click</strong> to add points to your current polygon</li>
+                        <li>Click <strong>"Finish & Start New"</strong> to complete the current zone and begin another
+                        </li>
+                        <li>Draw <strong>3+ points</strong> to create a polygon zone</li>
+                        <li>Each zone will be shown in a <strong>different color</strong></li>
+                    </ul>
+                </div>
 
                 <div class="form-group">
-                    <label>Draw Zone on Image</label>
+                    <label>Draw Zones on Image</label>
                     <div class="canvas-container"
                         style="position: relative; width: 100%; max-width: 800px; margin-bottom: 10px;">
                         <canvas id="imgZoneCanvas"
                             style="width: 100%; border: 1px solid #ccc; display: none; cursor: crosshair;"></canvas>
                         <div id="imgZonePlaceholder"
                             style="padding: 20px; text-align: center; background: #f0f0f0; border-radius: 6px; color: #666;">
-                            Select an image to draw zone
+                            Select an image to draw zones
                         </div>
                     </div>
-                    <button type="button" id="imgZoneClearBtn"
-                        style="padding: 5px 10px; font-size: 0.8rem; background: #636e72; color: white; border: none; border-radius: 4px; cursor: pointer;">Clear
-                        Points</button>
-                    <small style="display: block; margin-top: 5px; color: #666;">Points: <span
-                            id="imgZonePointCount">0</span></small>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;">
+                        <button type="button" id="finishImageZoneBtn"
+                            style="padding: 8px 16px; font-size: 0.9rem; background: #6c5ce7; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                            ✓ Finish & Start New Zone
+                        </button>
+                        <button type="button" id="imgZoneClearBtn"
+                            style="padding: 8px 16px; font-size: 0.9rem; background: #636e72; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            🗑️ Clear All Zones
+                        </button>
+                    </div>
+                    <small style="display: block; color: #666;">
+                        <span id="imgZonePointCount">0 pts / 0 complete</span> —
+                        <em>Dashed lines = in-progress, solid = complete</em>
+                    </small>
                 </div>
 
                 <div class="form-group">
                     <label for="imgZonePoints">
                         Zone Points
                         <span class="tooltip"
-                            data-tooltip="Format: [(x1,y1), (x2,y2), ...]. Defines the polygon zone.">ℹ️</span>
+                            data-tooltip="Single zone: [(x1,y1), ...]. Multiple zones: {'region-01': [...], 'region-02': [...]}">ℹ️</span>
                     </label>
                     <input type="text" name="img_zone_points" id="imgZonePoints"
                         placeholder="[(50, 50), (250, 50), ...]" readonly

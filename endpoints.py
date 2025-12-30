@@ -193,15 +193,21 @@ async def api_polygon_cross_count(
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
-    # Parse region points string to list
+    # Parse region points string - supports both list (single region) and dict (multiple regions)
     try:
         import ast
         points = ast.literal_eval(region_points)
-        if not isinstance(points, (list, tuple)):
-            raise ValueError
-    except:
+        # Validate format: either a list of tuples (single region) or dict of lists (multi-region)
+        if isinstance(points, dict):
+            # Multi-region format: {"region-01": [(x,y), ...], "region-02": [...]}
+            for key, val in points.items():
+                if not isinstance(val, (list, tuple)):
+                    raise ValueError(f"Region {key} must be a list of points")
+        elif not isinstance(points, (list, tuple)):
+            raise ValueError("region_points must be a list or dict")
+    except Exception as e:
         points = [(0, 0), (100, 100)] 
-        print(f"Failed to parse region points: {region_points}, using default.")
+        print(f"Failed to parse region points: {region_points}, error: {e}, using default.")
 
     # Parse classes
     class_list = None
@@ -243,15 +249,21 @@ async def api_image_zone_count(
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
-    # Parse region points string to list
+    # Parse region points string - supports both list (single region) and dict (multiple regions)
     try:
         import ast
         points = ast.literal_eval(region_points)
-        if not isinstance(points, (list, tuple)):
-            raise ValueError
-    except:
+        # Validate format: either a list of tuples (single region) or dict of lists (multi-region)
+        if isinstance(points, dict):
+            # Multi-region format: {"region-01": [(x,y), ...], "region-02": [...]}
+            for key, val in points.items():
+                if not isinstance(val, (list, tuple)):
+                    raise ValueError(f"Region {key} must be a list of points")
+        elif not isinstance(points, (list, tuple)):
+            raise ValueError("region_points must be a list or dict")
+    except Exception as e:
         points = [(0, 0), (100, 0), (100, 100), (0, 100)]
-        print(f"Failed to parse region points: {region_points}, using default.")
+        print(f"Failed to parse region points: {region_points}, error: {e}, using default.")
 
     # Parse classes
     class_list = None
