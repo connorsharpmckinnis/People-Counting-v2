@@ -1,7 +1,8 @@
 .venv/
 uploads/
 results/
-uploads/
+data/
+models/
 __pycache__/
 *.mp4
 *.mov
@@ -14,6 +15,4 @@ __pycache__/
 *.pth
 *.onnx
 .DS_Store
-
-
 mobileclip_blt.ts

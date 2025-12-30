@@ -6,19 +6,7 @@ import shutil
 from pathlib import Path
 
 from job_store import update_job_status
-import functions
 
-# Mapping job types to function names
-JOB_HANDLERS = {
-    "basic": functions.basic_count,
-    "sliced": functions.sliced_count,
-    "video": functions.video_count,
-    "sliced_video": functions.sliced_video_count,
-    "polygon_cross_count": functions.video_polygon_cross_count,
-    "image_zone_count": functions.image_zone_count,
-    "image_custom": functions.image_custom_classes,
-    "video_custom": functions.video_custom_classes,
-}
 
 def worker_loop(queue: multiprocessing.Queue):
     """
@@ -26,6 +14,21 @@ def worker_loop(queue: multiprocessing.Queue):
     Pulls job_ids from the queue and processes them.
     """
     print(f"Worker process started. PID: {os.getpid()}")
+
+    # Lazy import inside spawned process (CUDA-safe)
+    import functions
+
+    # Mapping job types to function names
+    JOB_HANDLERS = {
+        "basic": functions.basic_count,
+        "sliced": functions.sliced_count,
+        "video": functions.video_count,
+        "sliced_video": functions.sliced_video_count,
+        "polygon_cross_count": functions.video_polygon_cross_count,
+        "image_zone_count": functions.image_zone_count,
+        "image_custom": functions.image_custom_classes,
+        "video_custom": functions.video_custom_classes,
+    }
     
     while True:
         try:

@@ -16,6 +16,29 @@ from pathlib import Path
 from typing import TypedDict, Optional, List
 import torch
 
+# Directory to store model weight files (.pt)
+MODEL_DIR = os.path.join(os.getcwd(), "models")
+os.makedirs(MODEL_DIR, exist_ok=True)
+
+def get_model_path(model_name: str) -> str:
+    """
+    Always resolve model paths into MODEL_DIR.
+
+    - Bare names (e.g. 'yolo11n.pt') → /app/models/yolo11n.pt
+    - Relative paths → /app/models/<basename>
+    - Absolute paths → left untouched
+    """
+    if not model_name:
+        return model_name
+
+    # Absolute paths are respected (power users / tests)
+    if os.path.isabs(model_name):
+        return model_name
+
+    # Strip any directory parts and force into MODEL_DIR
+    model_filename = os.path.basename(model_name)
+    return os.path.join(MODEL_DIR, model_filename)
+
 
 class Config(TypedDict):
     model: str
@@ -248,10 +271,14 @@ def annotate_image(image_path: str, detections: sv.Detections, labels: list):
 
 
 
+
+
+
 def basic_count(image_path: str, config: dict) -> tuple[dict, str]:
 
 
-    model_path = config.get("model", "yolo11n.pt")
+    model_name = config.get("model", "yolo11n.pt")
+    model_path = get_model_path(model_name)
     conf_threshold = config.get("conf_threshold", 0.35)
 
     model = YOLO(model_path)
@@ -275,7 +302,8 @@ def basic_count(image_path: str, config: dict) -> tuple[dict, str]:
     return dict(counts), out_path
 
 def sliced_count(image_path: str, config: dict) -> tuple[dict, str]:
-    model = config.get("model", "yolo11n.pt")
+    model_name = config.get("model", "yolo11n.pt")
+    model_path = get_model_path(model_name)
     conf_threshold = config.get("conf_threshold", 0.35)
     slice_height = config.get("slice_height", 256)
     slice_width = config.get("slice_width", 256)
@@ -286,7 +314,7 @@ def sliced_count(image_path: str, config: dict) -> tuple[dict, str]:
 
     detection_model = AutoDetectionModel.from_pretrained(
         model_type="ultralytics",
-        model_path=model,
+        model_path=model_path,
         confidence_threshold=conf_threshold,
         device=device,
     )
@@ -345,7 +373,8 @@ def sliced_count(image_path: str, config: dict) -> tuple[dict, str]:
     return dict(counts), out_path
 
 def video_count(video_path: str, config: dict) -> tuple[dict, str]:
-    model_path = config.get("model", "yolo11n.pt")
+    model_name = config.get("model", "yolo11n.pt")
+    model_path = get_model_path(model_name)
     conf_threshold = config.get("conf_threshold", 0.35)
 
     model = YOLO(model_path)
@@ -446,7 +475,8 @@ def sliced_video_count(
     video_path: str, 
     config: dict
 ) -> tuple[dict, str]:
-    model_path = config.get("model", "yolo11n.pt")
+    model_name = config.get("model", "yolo11n.pt")
+    model_path = get_model_path(model_name)
     base, ext = os.path.splitext(video_path)
     save_path = f"{base}_annotated.mp4"  # Force .mp4 extension
     slice_wh = config.get("slice_wh") or (960, 960)
@@ -559,132 +589,232 @@ def sliced_video_count(
     final_counts = {cls: len(ids) for cls, ids in unique_ids.items()}
     return final_counts, final_path
 
+def normalize_region_points(region_points):
+    """Normalize region_points: convert lists to tuples (JSON gives lists)"""
+    if not region_points:
+        return None
+        
+    if isinstance(region_points, dict):
+        # Multi-region format: {"region-01": [(x,y), ...], "region-02": [...]}
+        normalized = {}
+        for key, pts in region_points.items():
+            normalized[key] = [tuple(p) if isinstance(p, list) else p for p in pts]
+        return normalized
+    elif isinstance(region_points, (list, tuple)):
+        # Single region format: [(x,y), ...]
+        return [tuple(p) if isinstance(p, list) else p for p in region_points]
+    return region_points
+
 def video_polygon_cross_count(video_file: str, config: dict) -> tuple[dict, str]:
     """
-    Count objects crossing a line or polygon in a video and return:
-    - dict of crossing counts
+    Count objects crossing regions or lines in a video and return:
+    - dict of cumulative region counts
     - filepath to annotated video
     """
-    base, ext = os.path.splitext(video_file)
-    save_path = config.get("save_path", f"{base}_annotated.mp4")
+    # --- Configuration ---
+    model_name = config.get("model", "yolo11n.pt")
+    model_path = get_model_path(model_name)
+    conf_threshold = config.get("conf_threshold", 0.5)
+    classes = config.get("classes")
     
+    # Normalize region_points to a dictionary
+    raw_region_points = config.get("region_points")
+    if isinstance(raw_region_points, dict):
+        region_dict = raw_region_points
+    elif isinstance(raw_region_points, (list, tuple)):
+        region_dict = {"region-01": raw_region_points}
+    else:
+        # Default fallback
+        region_dict = {}
+
+    # Normalize point formats (ensure tuples)
+    for name, pts in region_dict.items():
+        region_dict[name] = [tuple(p) if isinstance(p, list) else p for p in pts]
+
+    # --- Setup Video ---
     cap = cv2.VideoCapture(video_file)
     assert cap.isOpened(), "Error reading video file"
-
-    # Video properties
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
 
-    annotated_video_writer = cv2.VideoWriter(
-        save_path,
-        cv2.VideoWriter_fourcc(*"mp4v"),
-        fps,
-        (w, h),
-    )
+    base, ext = os.path.splitext(video_file)
+    save_path = config.get("save_path", f"{base}_annotated.mp4")
+    video_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
 
-    # Line counting (2 points = line), polygon counting (4 points = polygon) 
-    # Use config points or default to a vertical line in the middle
-    region_points = config.get("region_points")
-    if not region_points:
-        mid_x = w // 2
-        region_points = [(mid_x, 0), (mid_x, h)]
+    # --- Tracking State ---
+    model = YOLO(model_path)
+    # name -> {track_id: class_name}
+    cumulative_tracked_objects = {name: {} for name in region_dict}
+    track_history = {} # (track_id, region_name) -> side (for lines)
     
-    # Ensure region_points is a list of tuples (JSON gives list of lists)
-    if isinstance(region_points, list):
-        region_points = [tuple(p) if isinstance(p, list) else p for p in region_points]
+    # Pre-defined colors for regions
+    colors = [
+        (255, 0, 0), (0, 255, 0), (0, 0, 255), 
+        (255, 255, 0), (255, 0, 255), (0, 255, 255),
+        (255, 165, 0), (128, 0, 128)
+    ]
 
-    counter = solutions.ObjectCounter(
-        show=False,
-        region=region_points,
-        model=config.get("model", "yolo11n.pt"),
-        conf=config.get("conf_threshold", 0.5),
-        classes=config.get("classes"),
-        tracker=config.get("tracker", "bytetrack.yaml"),
-    )
+    def get_side(point, line_start, line_end):
+        """Cross product to find which side of a line a point is on."""
+        return (line_end[0] - line_start[0]) * (point[1] - line_start[1]) - \
+               (line_end[1] - line_start[1]) * (point[0] - line_start[0]) > 0
 
     while cap.isOpened():
-        success, im0 = cap.read()
+        success, frame = cap.read()
         if not success:
             break
 
-        results = counter(im0)
-        annotated_video_writer.write(results.plot_im)
+        # Run multi-object tracking
+        results = model.track(frame, persist=True, conf=conf_threshold, classes=classes, verbose=False)
+        annotated_frame = results[0].plot()
+
+        if results[0].boxes and results[0].boxes.id is not None:
+            boxes = results[0].boxes.xywh.cpu().numpy()
+            ids = results[0].boxes.id.int().cpu().numpy()
+            classes_idx = results[0].boxes.cls.int().cpu().numpy()
+            names = results[0].names
+
+            for tid, box, cidx in zip(ids, boxes, classes_idx):
+                center = (int(box[0]), int(box[1]))
+                class_name = names[cidx]
+                
+                for name, pts in region_dict.items():
+                    if len(pts) > 2:
+                        # --- Polygon Zone Counting ---
+                        dist = cv2.pointPolygonTest(np.array(pts, dtype=np.int32), center, False)
+                        if dist >= 0:
+                            cumulative_tracked_objects[name][tid] = class_name
+                    elif len(pts) == 2:
+                        # --- Line Crossing Counting ---
+                        line_start, line_end = pts[0], pts[1]
+                        current_side = get_side(center, line_start, line_end)
+                        key = (tid, name)
+                        
+                        if key in track_history:
+                            prev_side = track_history[key]
+                            if current_side != prev_side:
+                                cumulative_tracked_objects[name][tid] = class_name
+                        
+                        track_history[key] = current_side
+
+        # --- Draw Regions and Counts on Frame ---
+        for i, (name, pts) in enumerate(region_dict.items()):
+            color = colors[i % len(colors)]
+            count = len(cumulative_tracked_objects[name])
+            
+            # Draw shape
+            pts_array = np.array(pts, dtype=np.int32)
+            if len(pts) > 2:
+                cv2.polylines(annotated_frame, [pts_array], isClosed=True, color=color, thickness=2)
+            else:
+                cv2.line(annotated_frame, pts[0], pts[1], color=color, thickness=3)
+
+            # Draw Label and Count
+            label = f"{name}: {count}"
+            text_pos = pts[0]
+            cv2.putText(annotated_frame, label, (text_pos[0], text_pos[1] - 10), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+
+        video_writer.write(annotated_frame)
 
     cap.release()
-    annotated_video_writer.release()
+    video_writer.release()
     cv2.destroyAllWindows()
     
-    # Wait a bit for file to release
-    time.sleep(0.5)
+    # Final results: breakdown by class per region
+    final_counts = {}
+    for name, tracked_objs in cumulative_tracked_objects.items():
+        # tracked_objs is {tid: class_name}
+        class_counts = Counter(tracked_objs.values())
+        final_counts[name] = dict(class_counts)
+        
+    print(f"Cumulative counts: {final_counts}")
 
-    # --- Extract counts from the counter ---
-    cross_counts = getattr(counter, "classwise_count", {})
-
-    print(cross_counts)
-    
-    # Convert to H.264 for browser compatibility
+    # Convert to H.264
     base, ext = os.path.splitext(save_path)
     h264_path = f"{base}_h264.mp4"
-    
     if convert_to_h264(save_path, h264_path):
-        # Conversion successful, remove the mp4v version and use H.264
         os.remove(save_path)
         final_path = h264_path
     else:
-        # Conversion failed, use the mp4v version (user can download it)
-        print("Warning: H.264 conversion failed, using mp4v format")
         final_path = save_path
 
-    return cross_counts, final_path
+    return final_counts, final_path
 
 def image_zone_count(image_file: str, config: dict) -> tuple[dict, str]:
     """
-    Count objects in a defined region of an image and save an annotated copy
-    using the same naming convention as basic_count.
+    Count objects in defined regions of an image and return class-wise breakdown.
     """
-
     # --- Load image ---
     image = cv2.imread(image_file)
     assert image is not None, "Could not read image file"
 
     # --- Config ---
-    model = config.get("model", "yolo11n.pt")
+    model_name = config.get("model", "yolo11n.pt")
+    model_path = get_model_path(model_name)
     conf = config.get("conf_threshold", 0.5)
     classes = config.get("classes")
-    region_points = config.get("region_points")
     
-    # Ensure region_points is a list of tuples (JSON gives list of lists)
-    if isinstance(region_points, list):
-        region_points = [tuple(p) if isinstance(p, list) else p for p in region_points]
+    # Normalize region_points to dict
+    raw_region_points = config.get("region_points")
+    if isinstance(raw_region_points, dict):
+        region_dict = raw_region_points
+    elif isinstance(raw_region_points, (list, tuple)):
+        region_dict = {"zone-01": raw_region_points}
+    else:
+        region_dict = {}
 
-    # --- Initialize region counter ---
-    regioncounter = solutions.RegionCounter(
-        show=False,
-        region=region_points,
-        model=model,
-        conf=conf,
-        classes=classes,
-    )
+    # Normalize point formats
+    for name, pts in region_dict.items():
+        region_dict[name] = [tuple(p) if isinstance(p, list) else p for p in pts]
 
-    # --- Process image ---
-    results: solutions.RegionCounterResult = regioncounter.process(image)
+    # --- Run Inference ---
+    model = YOLO(model_path)
+    results = model.predict(image, conf=conf, classes=classes)
+    annotated_image = results[0].plot()
+
+    zone_counts = {name: Counter() for name in region_dict}
+
+    if results[0].boxes:
+        boxes = results[0].boxes.xywh.cpu().numpy()
+        classes_idx = results[0].boxes.cls.int().cpu().numpy()
+        names = results[0].names
+
+        for box, cidx in zip(boxes, classes_idx):
+            center = (int(box[0]), int(box[1]))
+            class_name = names[cidx]
+            
+            for name, pts in region_dict.items():
+                if len(pts) >= 3:
+                    dist = cv2.pointPolygonTest(np.array(pts, dtype=np.int32), center, False)
+                    if dist >= 0:
+                        zone_counts[name][class_name] += 1
+
+    # Finalize colors and drawing for zones
+    colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
+    for i, (name, pts) in enumerate(region_dict.items()):
+        color = colors[i % len(colors)]
+        pts_array = np.array(pts, dtype=np.int32)
+        cv2.polylines(annotated_image, [pts_array], isClosed=True, color=color, thickness=2)
+        
+        total = sum(zone_counts[name].values())
+        cv2.putText(annotated_image, f"{name}: {total}", (pts[0][0], pts[0][1] - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
 
     # --- Save annotated image ---
-    out_path = save_image(image_file, results.plot_im)
+    out_path = save_image(image_file, annotated_image)
 
-    # --- Return counts + path ---
-    return results.region_counts, out_path
+    # Convert Counter to dict
+    final_counts = {name: dict(counts) for name, counts in zone_counts.items()}
+    return final_counts, out_path
 
 def video_heatmap(video_file: str, config: dict) -> tuple[dict, str]:
-    model = config.get("model")
+    model_name = config.get("model")
+    model_path = get_model_path(model_name)
     classes = config.get("classes")
     conf = config.get("conf_threshold")
-    region_points = config.get("region_points")
-    
-    # Ensure region_points is a list of tuples (JSON gives list of lists)
-    if isinstance(region_points, list):
-        region_points = [tuple(p) if isinstance(p, list) else p for p in region_points]
+    region_points = normalize_region_points(config.get("region_points"))
     
     base, ext = os.path.splitext(video_file)
     save_path = config.get("save_path", f"{base}_annotated.mp4")
@@ -700,7 +830,7 @@ def video_heatmap(video_file: str, config: dict) -> tuple[dict, str]:
     # Initialize heatmap object
     heatmap = solutions.Heatmap(
         show=True,
-        model=model,
+        model=model_path,
         colormap=cv2.COLORMAP_PARULA,
         conf=conf,
         region=region_points,
@@ -745,10 +875,11 @@ def image_custom_classes(image_file: str, config: dict) -> tuple[dict, str]:
     using the same naming convention as basic_count.
     """
     classes = config.get("classes")
-    model = config.get("model")
+    model_name = config.get("model")
+    model_path = get_model_path(model_name)
     conf = config.get("conf_threshold")
     
-    model = YOLOE(model)
+    model = YOLOE(model_path)
 
     model.set_classes(classes)
 
@@ -778,7 +909,8 @@ def image_custom_classes(image_file: str, config: dict) -> tuple[dict, str]:
     return dict(object_counts), out_path
 
 def video_custom_classes(video_path: str, config: dict) -> tuple[dict, str]:
-    model_path = config.get("model")
+    model_name = config.get("model")
+    model_path = get_model_path(model_name)
     classes = config.get("classes")
     tracker = config.get("tracker", "botsort.yaml")
     conf_threshold = config.get("conf_threshold")

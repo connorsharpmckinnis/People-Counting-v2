@@ -20,10 +20,20 @@ services:
       - ./data:/app/data         # jobs.db lives here
       - ./results:/app/results   # Annotated output files
       - ./uploads:/app/uploads   # Temporary uploaded files
-    
+      - ./models:/app/models     # YOLO models folder
+      
     # Expose the port
     ports:
       - "8000:8000"
     
     # Restart if it crashes
     restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  

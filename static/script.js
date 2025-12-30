@@ -100,26 +100,42 @@ modelSelect.addEventListener("change", () => {
     modelInput.value = modelSelect.value;
 });
 
-// --- VIDEO REGION DRAWING LOGIC ---
+// --- VIDEO REGION DRAWING LOGIC (Multi-Polygon Support) ---
 const regionCanvas = document.getElementById("regionCanvas");
 const canvasPlaceholder = document.getElementById("canvasPlaceholder");
 const regionPointsInput = document.getElementById("regionPoints");
 const clearPointsBtn = document.getElementById("clearPointsBtn");
 const pointCountSpan = document.getElementById("pointCount");
-let currentPoints = [];
+
+// Multi-polygon data structure: array of arrays
+let videoPolygons = [];       // Array of completed polygons
+let currentVideoPoints = [];  // Points for the polygon currently being drawn
 let videoResolution = { width: 0, height: 0 };
 let currentFrameImage = null; // Store the frame for redrawing
 
-// --- IMAGE ZONE DRAWING LOGIC ---
-let imgZonePoints = [];
+// --- IMAGE ZONE DRAWING LOGIC (Multi-Polygon Support) ---
+let imagePolygons = [];       // Array of completed polygons  
+let currentImagePoints = [];  // Points for the polygon currently being drawn
 let imgResolution = { width: 0, height: 0 };
 let currentImgImage = null;
+
+// Distinct colors for multiple polygons
+const POLYGON_COLORS = [
+    { stroke: "#00b894", fill: "rgba(0, 184, 148, 0.2)" },   // Green
+    { stroke: "#0984e3", fill: "rgba(9, 132, 227, 0.2)" },   // Blue
+    { stroke: "#e17055", fill: "rgba(225, 112, 85, 0.2)" },  // Orange
+    { stroke: "#6c5ce7", fill: "rgba(108, 92, 231, 0.2)" },  // Purple
+    { stroke: "#fdcb6e", fill: "rgba(253, 203, 110, 0.2)" }, // Yellow
+    { stroke: "#e84393", fill: "rgba(232, 67, 147, 0.2)" },  // Pink
+    { stroke: "#00cec9", fill: "rgba(0, 206, 201, 0.2)" },   // Cyan
+    { stroke: "#ff7675", fill: "rgba(255, 118, 117, 0.2)" }, // Red
+];
 
 fileInput.addEventListener("change", (e) => {
     const file = e.target.files[0];
     if (!file) {
-        resetCanvas();
-        resetImgZoneCanvas();
+        resetVideoCanvas();
+        resetImageCanvas();
         return;
     }
 
@@ -128,17 +144,20 @@ fileInput.addEventListener("change", (e) => {
     } else if (typeSelect.value === "image_zone_count" && file.type.startsWith("image/")) {
         loadImageToCanvas(file);
     } else {
-        resetCanvas();
-        resetImgZoneCanvas();
+        resetVideoCanvas();
+        resetImageCanvas();
     }
 });
 
 function loadVideoFrame(file) {
     const video = document.createElement("video");
-    video.preload = "metadata";
+    video.preload = "auto";
     video.src = URL.createObjectURL(file);
     video.muted = true;
     video.playsInline = true;
+
+    // Use a flag to prevent multiple draws if seeked fires more than once
+    let frameCaptured = false;
 
     video.onloadedmetadata = () => {
         videoResolution.width = video.videoWidth;
@@ -148,36 +167,44 @@ function loadVideoFrame(file) {
         regionCanvas.width = video.videoWidth;
         regionCanvas.height = video.videoHeight;
 
-        // Seek to 0.1s to ensure we have a frame (sometimes 0.0 is empty)
-        video.currentTime = 0.1;
+        // Seek a bit further in (0.5s) to avoid potentially empty initial frames
+        video.currentTime = Math.min(0.5, video.duration || 0.5);
     };
 
     video.onseeked = () => {
-        // Draw frame to canvas
-        const ctx = regionCanvas.getContext("2d");
-        ctx.drawImage(video, 0, 0, regionCanvas.width, regionCanvas.height);
+        if (frameCaptured) return;
 
-        // Save frame for redrawing
-        currentFrameImage = ctx.getImageData(0, 0, regionCanvas.width, regionCanvas.height);
+        // Use a small timeout to ensure the browser has actually rendered the frame
+        // to the internal video buffer before we draw it to the canvas.
+        setTimeout(() => {
+            const ctx = regionCanvas.getContext("2d");
+            ctx.drawImage(video, 0, 0, regionCanvas.width, regionCanvas.height);
 
-        // Show canvas, hide placeholder
-        regionCanvas.style.display = "block";
-        canvasPlaceholder.style.display = "none";
+            // Save frame for redrawing
+            currentFrameImage = ctx.getImageData(0, 0, regionCanvas.width, regionCanvas.height);
 
-        // Clear previous points for new video
-        currentPoints = [];
-        updatePoints();
+            // Show canvas, hide placeholder
+            regionCanvas.style.display = "block";
+            canvasPlaceholder.style.display = "none";
 
-        // Cleanup: vital to stop the video element from trying to buffer more data
-        // which causes the ERR_FILE_NOT_FOUND error if we just revoke immediately
-        const blobUrl = video.src;
-        video.src = "";
-        video.load(); // stops the stream
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+            // Clear previous polygons for new video
+            videoPolygons = [];
+            currentVideoPoints = [];
+            updateVideoRegionDisplay();
+
+            frameCaptured = true;
+
+            // Cleanup
+            const blobUrl = video.src;
+            video.src = "";
+            video.load();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 200);
+        }, 300); // 300ms delay for decoder stability
     };
 
     video.onerror = () => {
-        canvasPlaceholder.textContent = "Error loading video frame. Please check format.";
+        canvasPlaceholder.textContent = "Error loading video frame. The file format or codec may not be supported by your browser.";
+        canvasPlaceholder.style.color = "#d63031";
     };
 }
 
@@ -199,8 +226,10 @@ function loadImageToCanvas(file) {
         imgZoneCanvas.style.display = "block";
         imgZonePlaceholder.style.display = "none";
 
-        imgZonePoints = [];
-        updateImgZonePoints();
+        // Clear previous polygons for new image
+        imagePolygons = [];
+        currentImagePoints = [];
+        updateImageRegionDisplay();
 
         URL.revokeObjectURL(img.src);
     };
@@ -210,90 +239,207 @@ function loadImageToCanvas(file) {
     img.src = URL.createObjectURL(file);
 }
 
-function resetCanvas() {
+function resetVideoCanvas() {
     regionCanvas.style.display = "none";
     canvasPlaceholder.style.display = "block";
-    currentPoints = [];
-    updatePoints();
+    videoPolygons = [];
+    currentVideoPoints = [];
+    updateVideoRegionDisplay();
 }
 
-function resetImgZoneCanvas() {
+function resetImageCanvas() {
     imgZoneCanvas.style.display = "none";
     imgZonePlaceholder.style.display = "block";
-    imgZonePoints = [];
-    updateImgZonePoints();
+    imagePolygons = [];
+    currentImagePoints = [];
+    updateImageRegionDisplay();
 }
 
-// Handler for Video Canvas
+// --- CLICK HANDLERS ---
+
+// Single click: Add point to current polygon
 regionCanvas.addEventListener("click", (e) => {
-    handleCanvasClick(e, regionCanvas, videoResolution, currentPoints, updatePoints, redrawCanvas);
-});
+    const rect = regionCanvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0 || videoResolution.width === 0) return;
 
-// Handler for Image Canvas
-imgZoneCanvas.addEventListener("click", (e) => {
-    handleCanvasClick(e, imgZoneCanvas, imgResolution, imgZonePoints, updateImgZonePoints, redrawImgZoneCanvas);
-});
-
-function handleCanvasClick(e, canvas, resolution, pointsArray, updateFn, redrawFn) {
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0 || resolution.width === 0) return;
-
-    const scaleX = resolution.width / rect.width;
-    const scaleY = resolution.height / rect.height;
+    const scaleX = videoResolution.width / rect.width;
+    const scaleY = videoResolution.height / rect.height;
 
     const x = Math.round((e.clientX - rect.left) * scaleX);
     const y = Math.round((e.clientY - rect.top) * scaleY);
 
-    pointsArray.push([x, y]);
-    updateFn();
-    redrawFn();
-}
+    currentVideoPoints.push([x, y]);
+    updateVideoRegionDisplay();
+    redrawVideoCanvas();
+});
 
+imgZoneCanvas.addEventListener("click", (e) => {
+    const rect = imgZoneCanvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0 || imgResolution.width === 0) return;
+
+    const scaleX = imgResolution.width / rect.width;
+    const scaleY = imgResolution.height / rect.height;
+
+    const x = Math.round((e.clientX - rect.left) * scaleX);
+    const y = Math.round((e.clientY - rect.top) * scaleY);
+
+    currentImagePoints.push([x, y]);
+    updateImageRegionDisplay();
+    redrawImageCanvas();
+});
+
+// --- FINISH REGION BUTTONS ---
+// These finalize the current polygon and allow starting a new one
+
+const finishVideoRegionBtn = document.getElementById("finishVideoRegionBtn");
+const finishImageZoneBtn = document.getElementById("finishImageZoneBtn");
+
+finishVideoRegionBtn.addEventListener("click", () => {
+    if (currentVideoPoints.length >= 2) {
+        videoPolygons.push([...currentVideoPoints]);
+        currentVideoPoints = [];
+        updateVideoRegionDisplay();
+        redrawVideoCanvas();
+    } else {
+        alert("Please draw at least 2 points before finishing a region.");
+    }
+});
+
+finishImageZoneBtn.addEventListener("click", () => {
+    if (currentImagePoints.length >= 2) {
+        imagePolygons.push([...currentImagePoints]);
+        currentImagePoints = [];
+        updateImageRegionDisplay();
+        redrawImageCanvas();
+    } else {
+        alert("Please draw at least 2 points before finishing a zone.");
+    }
+});
+
+// --- CLEAR BUTTONS ---
 clearPointsBtn.addEventListener("click", () => {
-    currentPoints = [];
-    updatePoints();
-    redrawCanvas();
+    videoPolygons = [];
+    currentVideoPoints = [];
+    updateVideoRegionDisplay();
+    redrawVideoCanvas();
 });
 
 imgZoneClearBtn.addEventListener("click", () => {
-    imgZonePoints = [];
-    updateImgZonePoints();
-    redrawImgZoneCanvas();
+    imagePolygons = [];
+    currentImagePoints = [];
+    updateImageRegionDisplay();
+    redrawImageCanvas();
 });
 
-function updatePoints() {
-    pointCountSpan.textContent = currentPoints.length;
-    regionPointsInput.value = "[" + currentPoints.map(p => `(${p[0]}, ${p[1]})`).join(", ") + "]";
+// --- DISPLAY UPDATE FUNCTIONS ---
+
+function updateVideoRegionDisplay() {
+    // Count total points across all polygons + current
+    const totalPoints = videoPolygons.reduce((sum, poly) => sum + poly.length, 0) + currentVideoPoints.length;
+    const totalRegions = videoPolygons.length + (currentVideoPoints.length >= 2 ? 1 : 0);
+
+    pointCountSpan.textContent = `${totalPoints} pts / ${videoPolygons.length} complete`;
+
+    // Serialize as dictionary format for backend: {"region-01": [...], "region-02": [...]}
+    const allPolygons = [...videoPolygons];
+    if (currentVideoPoints.length >= 2) {
+        allPolygons.push(currentVideoPoints);
+    }
+
+    if (allPolygons.length === 0) {
+        regionPointsInput.value = "";
+    } else if (allPolygons.length === 1) {
+        // Single region - use list format for backward compatibility
+        regionPointsInput.value = "[" + allPolygons[0].map(p => `(${p[0]}, ${p[1]})`).join(", ") + "]";
+    } else {
+        // Multiple regions - use dictionary format
+        const regionDict = {};
+        allPolygons.forEach((poly, idx) => {
+            regionDict[`region-${String(idx + 1).padStart(2, '0')}`] = poly.map(p => `(${p[0]}, ${p[1]})`);
+        });
+        // Format as Python dict string
+        let parts = [];
+        for (const [key, pts] of Object.entries(regionDict)) {
+            parts.push(`"${key}": [${pts.join(", ")}]`);
+        }
+        regionPointsInput.value = "{" + parts.join(", ") + "}";
+    }
 }
 
-function updateImgZonePoints() {
-    imgZonePointCountSpan.textContent = imgZonePoints.length;
-    imgZonePointsInput.value = "[" + imgZonePoints.map(p => `(${p[0]}, ${p[1]})`).join(", ") + "]";
+function updateImageRegionDisplay() {
+    const totalPoints = imagePolygons.reduce((sum, poly) => sum + poly.length, 0) + currentImagePoints.length;
+
+    imgZonePointCountSpan.textContent = `${totalPoints} pts / ${imagePolygons.length} complete`;
+
+    const allPolygons = [...imagePolygons];
+    if (currentImagePoints.length >= 2) {
+        allPolygons.push(currentImagePoints);
+    }
+
+    if (allPolygons.length === 0) {
+        imgZonePointsInput.value = "";
+    } else if (allPolygons.length === 1) {
+        imgZonePointsInput.value = "[" + allPolygons[0].map(p => `(${p[0]}, ${p[1]})`).join(", ") + "]";
+    } else {
+        const regionDict = {};
+        allPolygons.forEach((poly, idx) => {
+            regionDict[`region-${String(idx + 1).padStart(2, '0')}`] = poly.map(p => `(${p[0]}, ${p[1]})`);
+        });
+        let parts = [];
+        for (const [key, pts] of Object.entries(regionDict)) {
+            parts.push(`"${key}": [${pts.join(", ")}]`);
+        }
+        imgZonePointsInput.value = "{" + parts.join(", ") + "}";
+    }
 }
 
-function redrawCanvas() {
-    drawOnCanvas(regionCanvas, currentFrameImage, currentPoints, videoResolution);
+// --- DRAWING FUNCTIONS ---
+
+function redrawVideoCanvas() {
+    drawMultiPolygonCanvas(regionCanvas, currentFrameImage, videoPolygons, currentVideoPoints, videoResolution);
 }
 
-function redrawImgZoneCanvas() {
-    drawOnCanvas(imgZoneCanvas, currentImgImage, imgZonePoints, imgResolution);
+function redrawImageCanvas() {
+    drawMultiPolygonCanvas(imgZoneCanvas, currentImgImage, imagePolygons, currentImagePoints, imgResolution);
 }
 
-function drawOnCanvas(canvas, bgImage, points, resolution) {
+function drawMultiPolygonCanvas(canvas, bgImage, completedPolygons, currentPoints, resolution) {
     if (!bgImage) return;
     const ctx = canvas.getContext("2d");
     ctx.putImageData(bgImage, 0, 0);
 
-    if (points.length === 0) return;
-
     const scaleLine = Math.max(2, resolution.width / 400);
     const scaleRadius = Math.max(3, resolution.width / 200);
 
-    // 1. Draw Lines/Polygon
+    // Draw all completed polygons
+    completedPolygons.forEach((polygon, polyIndex) => {
+        const colorIdx = polyIndex % POLYGON_COLORS.length;
+        const color = POLYGON_COLORS[colorIdx];
+        drawSinglePolygon(ctx, polygon, color, scaleLine, scaleRadius, true);
+    });
+
+    // Draw current in-progress polygon (with dashed lines to show it's incomplete)
+    if (currentPoints.length > 0) {
+        const colorIdx = completedPolygons.length % POLYGON_COLORS.length;
+        const color = POLYGON_COLORS[colorIdx];
+        drawSinglePolygon(ctx, currentPoints, color, scaleLine, scaleRadius, false);
+    }
+}
+
+function drawSinglePolygon(ctx, points, color, scaleLine, scaleRadius, isComplete) {
+    if (points.length === 0) return;
+
+    // Draw lines/polygon
     if (points.length > 1) {
         ctx.beginPath();
         ctx.lineWidth = scaleLine;
-        ctx.strokeStyle = "#00b894"; // success color
+        ctx.strokeStyle = color.stroke;
+
+        if (!isComplete) {
+            ctx.setLineDash([10, 5]); // Dashed line for in-progress
+        } else {
+            ctx.setLineDash([]); // Solid line for complete
+        }
 
         ctx.moveTo(points[0][0], points[0][1]);
 
@@ -301,24 +447,37 @@ function drawOnCanvas(canvas, bgImage, points, resolution) {
             ctx.lineTo(points[i][0], points[i][1]);
         }
 
-        // Close polygon if > 2 points (draw line back to start)
-        if (points.length > 2) {
+        // Close polygon if > 2 points and complete
+        if (points.length > 2 && isComplete) {
             ctx.lineTo(points[0][0], points[0][1]);
-            // Optional: fill polygon with transparent color
-            ctx.fillStyle = "rgba(0, 184, 148, 0.2)";
+            ctx.fillStyle = color.fill;
             ctx.fill();
         }
 
         ctx.stroke();
+        ctx.setLineDash([]); // Reset
     }
 
-    // 2. Draw Points (Vertices) on top
-    ctx.fillStyle = "#ff7675"; // point color
+    // Draw points (vertices)
+    ctx.fillStyle = color.stroke; // Use same color as stroke for points
 
     for (let i = 0; i < points.length; i++) {
         ctx.beginPath();
         ctx.arc(points[i][0], points[i][1], scaleRadius, 0, Math.PI * 2);
         ctx.fill();
+    }
+
+    // Draw region label for complete polygons
+    if (isComplete && points.length > 0) {
+        // Calculate centroid for label placement
+        const cx = points.reduce((sum, p) => sum + p[0], 0) / points.length;
+        const cy = points.reduce((sum, p) => sum + p[1], 0) / points.length;
+
+        ctx.font = `bold ${Math.max(14, scaleLine * 8)}px Arial`;
+        ctx.fillStyle = color.stroke;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        // We don't have the index here, so skip labeling for now
     }
 }
 
