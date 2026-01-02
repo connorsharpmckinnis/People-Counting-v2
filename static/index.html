@@ -28,13 +28,19 @@
             <h2>Configuration</h2>
 
             <!-- File Upload -->
-            <div class="form-group">
-                <label for="fileInput">
-                    Select File
-                    <span class="tooltip"
-                        data-tooltip="Choose an image (.jpg, .png) or video (.mp4) to process">ℹ️</span>
-                </label>
-                <input type="file" name="file" id="fileInput" accept="image/*,video/*" required>
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-content">
+                    <span class="drop-zone-icon">📁</span>
+                    <span class="drop-zone-text">Click to upload or drag & drop</span>
+                    <span class="drop-zone-hint">Supports Images (.jpg, .png) and Videos (.mp4, .mov)</span>
+                </div>
+                <input type="file" name="file" id="fileInput" accept="image/*,video/*" required class="drop-zone-input">
+            </div>
+            <div id="filePreview" class="file-preview" style="display:none;">
+                <div class="preview-info">
+                    <span id="previewName"></span>
+                    <button type="button" id="removeFileBtn" class="remove-btn">&times;</button>
+                </div>
             </div>
 
             <!-- Processing Type -->
@@ -45,14 +51,19 @@
                         data-tooltip="Basic: Fast standard detection. Sliced: Better for small objects, uses tiled processing.">ℹ️</span>
                 </label>
                 <select name="type" id="typeSelect">
-                    <option value="basic">Basic Image</option>
-                    <option value="sliced">Sliced Image (Better for small objects)</option>
-                    <option value="video">Basic Video</option>
-                    <option value="sliced_video">Sliced Video (Better for small objects)</option>
-                    <option value="polygon_cross_count">Polygon Crossing (Video)</option>
-                    <option value="image_zone_count">Image Zone Counting</option>
-                    <option value="image_custom">Image (Custom Classes)</option>
-                    <option value="video_custom">Video (Custom Classes)</option>
+                    <optgroup label="🖼️ Images" id="imageGroup">
+                        <option value="basic">Basic Image</option>
+                        <option value="sliced">Sliced Image (Better for small objects)</option>
+                        <option value="image_zone_count">Image Zone Counting</option>
+                        <option value="image_custom">Advanced Image (Custom Classes)</option>
+                    </optgroup>
+                    <optgroup label="🎥 Videos" id="videoGroup">
+                        <option value="video">Basic Video</option>
+                        <option value="sliced_video">Sliced Video (Better for small objects)</option>
+                        <option value="polygon_cross_count">Polygon Crossing</option>
+                        <option value="video_custom">Advanced Video (Custom Classes)</option>
+                        <option value="stream">YouTube Livestream (Real-time)</option>
+                    </optgroup>
                 </select>
             </div>
 
@@ -331,6 +342,39 @@
                 </div>
             </div>
 
+            <!-- Livestream Settings -->
+            <div id="livestreamSettings" class="advanced-settings" style="display:none;">
+                <h3>Livestream Settings</h3>
+                <p class="settings-description">Process a live YouTube stream for a set duration</p>
+
+                <div class="form-group">
+                    <label for="streamUrl">
+                        YouTube URL
+                        <span class="tooltip" data-tooltip="The full URL to the YouTube livestream.">ℹ️</span>
+                    </label>
+                    <input type="text" name="youtube_url" id="streamUrl"
+                        placeholder="https://www.youtube.com/watch?v=..." class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="streamDuration">
+                        Capture Duration (seconds)
+                        <span class="tooltip"
+                            data-tooltip="How long to analyze the stream. 30-300 seconds is usually good for a sample.">ℹ️</span>
+                    </label>
+                    <input type="number" name="duration" id="streamDuration" value="30" min="5" max="1800">
+                </div>
+
+                <div class="form-group">
+                    <label for="streamFrameSkip">
+                        Frame Skip
+                        <span class="tooltip"
+                            data-tooltip="Sample every Nth frame. Higher = faster, Lower = more smooth tracking.">ℹ️</span>
+                    </label>
+                    <input type="number" name="frame_skip" id="streamFrameSkip" value="5" min="1" max="60">
+                </div>
+            </div>
+
             <!-- Complexity Estimation -->
             <div id="estimationSection" class="info-card"
                 style="display:none; margin-top: 1.5rem; border-left: 5px solid var(--warning-color);">
@@ -378,7 +422,13 @@
             <h2>Results</h2>
             <div class="results-grid">
                 <div class="results-card">
-                    <h3>Object Counts</h3>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="margin: 0;">Object Counts</h3>
+                        <button type="button" id="copyResultsBtn" class="btn"
+                            style="padding: 4px 12px; font-size: 0.8rem; background: var(--secondary-color); border-radius: 4px;">📋
+                            Copy</button>
+                    </div>
                     <pre id="results"></pre>
                 </div>
                 <div class="results-card">

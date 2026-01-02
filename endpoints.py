@@ -26,6 +26,12 @@ def save_upload_file(upload_file: UploadFile, dest: Path) -> Path:
         f.write(upload_file.file.read())
     return dest
 
+def is_image(filename: str) -> bool:
+    return Path(filename).suffix.lower() in [".jpg", ".jpeg", ".png", ".bmp", ".webp"]
+
+def is_video(filename: str) -> bool:
+    return Path(filename).suffix.lower() in [".mp4", ".avi", ".mov", ".mkv"]
+
 
 
 @router.post("/basic-count")
@@ -40,6 +46,10 @@ async def api_basic_count(
     ext = Path(file.filename).suffix.lower()
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
+
+    if not is_image(str(filename)):
+        os.remove(filename)
+        raise HTTPException(status_code=400, detail="This endpoint only accepts image files.")
 
     # Parse classes
     class_list = None
@@ -79,6 +89,10 @@ async def api_sliced_count(
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
+    if not is_image(str(filename)):
+        os.remove(filename)
+        raise HTTPException(status_code=400, detail="This endpoint only accepts image files.")
+
     # Parse classes
     class_list = None
     if classes:
@@ -117,6 +131,10 @@ async def api_video_count(
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
+    if not is_video(str(filename)):
+        os.remove(filename)
+        raise HTTPException(status_code=400, detail="This endpoint only accepts video files.")
+
     # Parse classes
     class_list = None
     if classes:
@@ -153,6 +171,10 @@ async def api_sliced_video_count(
     ext = Path(file.filename).suffix.lower()
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
+
+    if not is_video(str(filename)):
+        os.remove(filename)
+        raise HTTPException(status_code=400, detail="This endpoint only accepts video files.")
 
     # Parse classes
     class_list = None
@@ -192,6 +214,10 @@ async def api_polygon_cross_count(
     ext = Path(file.filename).suffix.lower()
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
+
+    if not is_video(str(filename)):
+        os.remove(filename)
+        raise HTTPException(status_code=400, detail="This endpoint only accepts video files.")
 
     # Parse region points string - supports both list (single region) and dict (multiple regions)
     try:
@@ -248,6 +274,10 @@ async def api_image_zone_count(
     ext = Path(file.filename).suffix.lower()
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
+
+    if not is_image(str(filename)):
+        os.remove(filename)
+        raise HTTPException(status_code=400, detail="This endpoint only accepts image files.")
 
     # Parse region points string - supports both list (single region) and dict (multiple regions)
     try:
@@ -320,6 +350,10 @@ async def api_image_custom_count(
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
+    if not is_image(str(filename)):
+        os.remove(filename)
+        raise HTTPException(status_code=400, detail="This endpoint only accepts image files.")
+
     class_list = []
     if classes:
         class_list = [c.strip() for c in classes.split(",") if c.strip()]
@@ -351,6 +385,10 @@ async def api_video_custom_count(
     filename = UPLOAD_DIR / f"{file_id}{ext}"
     save_upload_file(file, filename)
 
+    if not is_video(str(filename)):
+        os.remove(filename)
+        raise HTTPException(status_code=400, detail="This endpoint only accepts video files.")
+
     class_list = []
     if classes:
         class_list = [c.strip() for c in classes.split(",") if c.strip()]
@@ -364,6 +402,41 @@ async def api_video_custom_count(
     }
 
     job_id = create_job("video_custom", str(filename), config)
+    request.app.state.queue.put(job_id)
+
+    return JSONResponse({"job_id": job_id, "status": "queued"})
+
+
+@router.post("/stream-count")
+async def api_stream_count(
+    request: Request,
+    youtube_url: str = Form(...),
+    model: Optional[str] = Form("yolo11n.pt"),
+    conf_threshold: Optional[float] = Form(0.35),
+    duration: Optional[int] = Form(30), # Seconds to observe
+    frame_skip: Optional[int] = Form(5),
+    classes: Optional[str] = Form(None)
+):
+    # Parse classes
+    class_list = None
+    if classes:
+        try:
+            import json
+            class_list = json.loads(classes)
+        except:
+            print(f"Failed to parse classes: {classes}")
+
+    config = {
+        "model": model,
+        "conf_threshold": conf_threshold,
+        "duration": duration,
+        "frame_skip": frame_skip,
+        "classes": class_list,
+        "show_window": False # Always false for API usage
+    }
+
+    # Create job with the URL as the filename/source
+    job_id = create_job("stream", youtube_url, config)
     request.app.state.queue.put(job_id)
 
     return JSONResponse({"job_id": job_id, "status": "queued"})

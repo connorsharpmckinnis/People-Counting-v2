@@ -5,6 +5,7 @@ from collections import Counter
 from ultralytics import YOLO, solutions, YOLOWorld, YOLOE
 from ultralytics.trackers.byte_tracker import BYTETracker
 from collections import defaultdict
+from ultralytics.models.sam import SAM3SemanticPredictor
 import cv2
 import numpy as np
 import supervision as sv
@@ -15,6 +16,8 @@ import time
 from pathlib import Path
 from typing import TypedDict, Optional, List
 import torch
+import yt_dlp
+
 
 # Directory to store model weight files (.pt)
 MODEL_DIR = os.path.join(os.getcwd(), "models")
@@ -470,6 +473,8 @@ def video_count(video_path: str, config: dict) -> tuple[dict, str]:
 
     count_dict = {cls: len(ids) for cls, ids in seen_ids.items()}
     return count_dict, final_path
+
+
 
 def sliced_video_count(
     video_path: str, 
@@ -1009,20 +1014,194 @@ def video_custom_classes(video_path: str, config: dict) -> tuple[dict, str]:
 
     count_dict = {cls: len(ids) for cls, ids in seen_ids.items()}
     return count_dict, final_path
+
+def stream_count(youtube_url: str, config: dict) -> tuple[dict, str]:
+    """
+    Counts detected objects on a YouTube livestream and displays/saves the annotated stream.
     
+    Args:
+        youtube_url (str): The URL of the YouTube livestream.
+        config (dict): Configuration dictionary.
+            - duration: Max seconds to process (optional).
+            - show_window: Whether to show the OpenCV window (default: False).
+            - frame_skip: Sample every N frames (default: 5).
+        
+    Returns:
+        tuple[dict, str]: (Unique counts, Path to the last annotated frame)
+    """
+
+    # 1. Get stream URL using yt-dlp
+    print(f"Fetching stream URL for: {youtube_url}")
+    ydl_opts = {
+        'format': 'best',
+        'quiet': True,
+        'no_warnings': True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(youtube_url, download=False)
+            stream_url = info['url']
+    except Exception as e:
+        print(f"Error fetching stream URL: {e}")
+        return {}, ""
+
+    # 2. Setup Parameters & Model
+    model_name = config.get("model", "yolo11n.pt")
+    model_path = get_model_path(model_name)
+    conf_threshold = config.get("conf_threshold", 0.35)
+    tracker = config.get("tracker", "botsort.yaml")
+    show_window = config.get("show_window", False)
+    duration = config.get("duration") # in seconds
+    frame_skip = config.get("frame_skip", 5)
+
+    model = YOLO(model_path)
+
+    # 3. Handle Classes
+    classes = config.get("classes")
+    if classes and isinstance(classes, list) and len(classes) > 0 and isinstance(classes[0], str):
+        name_to_id = {v: k for k, v in model.names.items()}
+        classes = [name_to_id[c] for c in classes if c in name_to_id]
+
+    # 4. Supervision Setup
+    box_annotator = sv.BoxAnnotator(thickness=2)
+    label_annotator = sv.LabelAnnotator(
+        text_scale=0.8,
+        text_thickness=2,
+        text_color=sv.Color.WHITE
+    )
+
+    seen_ids = {}
+    class_names = model.names
+    last_annotated_frame = None
+
+    # 5. Stream Processing
+    cap = cv2.VideoCapture(stream_url)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
+
+    if not cap.isOpened():
+        print("Error: Could not open video stream.")
+        return {}, ""
+    
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    frame_time = 1.0 / fps
+    start_wall_time = time.perf_counter()
+    
+    print(f"Stream processing started (sampling every {frame_skip} frames). Show UI: {show_window}")
+
+    last_process_time = 0
+    last_detections = None
+    last_labels = None
+
+    try:
+        while True:
+            cycle_start = time.perf_counter()
+            
+            # Check duration limit
+            if duration and (cycle_start - start_wall_time) > duration:
+                print(f"Duration limit of {duration}s reached.")
+                break
+
+            for i in range(frame_skip):
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                
+                is_process_frame = (i == frame_skip - 1)
+
+                if is_process_frame:
+                    # AI Processing
+                    start_p = time.perf_counter()
+                    results = model.track(
+                        source=frame,
+                        tracker=tracker,
+                        conf=conf_threshold,
+                        classes=classes,
+                        persist=True,
+                        verbose=False
+                    )
+                    last_process_time = time.perf_counter() - start_p
+                    
+                    if results and len(results) > 0:
+                        frame_results = results[0]
+                        det = sv.Detections.from_ultralytics(frame_results)
+                        if det.tracker_id is not None and len(det) > 0:
+                            det = det[det.tracker_id != None]
+                            if len(det) > 0:
+                                labels = []
+                                for cls_id, track_id in zip(det.class_id, det.tracker_id):
+                                    cls_name = class_names[cls_id]
+                                    labels.append(f"{cls_name} #{track_id}")
+                                    seen_ids.setdefault(cls_name, set()).add(int(track_id))
+                                
+                                last_detections = det
+                                last_labels = labels
+
+                # Annotate
+                if last_detections is not None:
+                    frame = box_annotator.annotate(scene=frame, detections=last_detections)
+                    frame = label_annotator.annotate(scene=frame, detections=last_detections, labels=last_labels)
+
+                # Overlays
+                y_offset = 30
+                info_text = f"FPS: {fps:.1f} | Process: {last_process_time:.3f}s | Skip: {frame_skip}"
+                cv2.putText(frame, info_text, (20, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                
+                y_offset += 30
+                for cls_name, ids in seen_ids.items():
+                    cv2.putText(frame, f"Total {cls_name}: {len(ids)}", (20, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                    y_offset += 30
+
+                last_annotated_frame = frame
+
+                # Display if requested
+                if show_window:
+                    cv2.imshow("YouTube Livestream Detection", frame)
+                    
+                    # Manual pacing to match real-time
+                    expected_elapsed = (i + 1) * frame_time
+                    actual_elapsed = time.perf_counter() - cycle_start
+                    wait_time = max(1, int((expected_elapsed - actual_elapsed) * 1000))
+                    
+                    if cv2.waitKey(wait_time) & 0xFF == ord('q'):
+                        print("\nStream stopped by user.")
+                        raise KeyboardInterrupt # Break both loops
+                else:
+                    # In headless mode, we don't need to wait between frames unless processing is too fast
+                    pass
+
+    except (KeyboardInterrupt, Exception) as e:
+        if not isinstance(e, KeyboardInterrupt):
+            print(f"Error during stream processing: {e}")
+            import traceback
+            traceback.print_exc()
+    finally:
+        cap.release()
+        if show_window:
+            cv2.destroyAllWindows()
+
+    # Save final snapshot
+    snapshot_path = "stream_snapshot.jpg"
+    if last_annotated_frame is not None:
+        cv2.imwrite(snapshot_path, last_annotated_frame)
+    
+    final_counts = {cls: len(ids) for cls, ids in seen_ids.items()}
+    return final_counts, snapshot_path
+
+
 def test():
 
     config = Config(
-        model="yoloe-11s-seg.pt",
-        classes=['animal', 'human', 'hat'],
+        model="yolo11n.pt",
+        classes=[0, 1, 2, 3],
         tracker="botsort.yaml",
-        conf_threshold=0.2,
+        conf_threshold=0.4,
         slice_wh=(960, 960),
         overlap_wh=(10, 10),
         slice_height=256,
         slice_width=256,
         overlap_height_ratio=0.2,
         overlap_width_ratio=0.2,
+        frame_skip=5,
         #region_points=[(100, 100), (100, 500), (500, 500), (500, 100)],
     )
     
@@ -1030,8 +1209,8 @@ def test():
     # print(f'YOLOE: {results}')
 
 
-    complexity = estimate_image_complexity("horse.png", config)
-    print(f'Complexity: {complexity}')
+    results = stream_count("https://www.youtube.com/watch?v=-MWn7E2O-_o", config)
+    print(f'Results: {results}')
 
 if __name__ == "__main__":
     test()

@@ -28,6 +28,7 @@ def worker_loop(queue: multiprocessing.Queue):
         "image_zone_count": functions.image_zone_count,
         "image_custom": functions.image_custom_classes,
         "video_custom": functions.video_custom_classes,
+        "stream": functions.stream_count,
     }
     
     while True:
@@ -84,17 +85,15 @@ def worker_loop(queue: multiprocessing.Queue):
             result_data = {
                 "counts": counts,
                 "annotated_file": f"/secure-results/{final_filename}",
-                "file_type": "video" if job_type in ["video", "sliced_video", "video_custom", "polygon_cross_count"] else "image"
+                "file_type": "video" if ext.lower() == ".mp4" else "image"
             }
             
             update_job_status(job_id, "completed", result=result_data)
             print(f"Job {job_id} completed successfully.")
             
-            # Clean up input file? 
-            # Ideally yes, but maybe keep for debugging? 
-            # Let's remove to save space.
+            # Clean up input file if it's a real file (not a URL)
             try:
-                if os.path.exists(filename):
+                if os.path.exists(filename) and not filename.startswith("http"):
                      os.remove(filename)
             except:
                 pass
