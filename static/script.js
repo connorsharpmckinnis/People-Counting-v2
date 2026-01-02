@@ -8,6 +8,15 @@ const slicedImageSettings = document.getElementById("slicedImageSettings");
 const slicedVideoSettings = document.getElementById("slicedVideoSettings");
 const polygonCrossCountSettings = document.getElementById("polygonCrossCountSettings");
 const resultsSection = document.getElementById("resultsSection");
+const fileInput = document.getElementById("fileInput");
+const dropZone = document.getElementById("dropZone");
+const filePreview = document.getElementById("filePreview");
+const previewName = document.getElementById("previewName");
+const removeFileBtn = document.getElementById("removeFileBtn");
+const livestreamSettings = document.getElementById("livestreamSettings");
+const imageGroup = document.getElementById("imageGroup");
+const videoGroup = document.getElementById("videoGroup");
+
 const confInput = document.getElementById("confInput");
 const confValue = document.getElementById("confValue");
 const btnText = document.getElementById("btnText");
@@ -21,12 +30,12 @@ const imgZonePointsInput = document.getElementById("imgZonePoints");
 const imgZoneClearBtn = document.getElementById("imgZoneClearBtn");
 const imgZonePointCountSpan = document.getElementById("imgZonePointCount");
 
-
 const modelSelect = document.getElementById("modelSelect");
 const modelInput = document.getElementById("modelInput");
 const standardClassesGroup = document.getElementById("standardClassesGroup");
 const customClassesGroup = document.getElementById("customClassesGroup");
 const customClassesInput = document.getElementById("customClassesInput");
+
 
 // Update confidence value display in real-time
 confInput.addEventListener("input", () => {
@@ -57,6 +66,20 @@ typeSelect.addEventListener("change", () => {
         if (fileInput.files.length > 0) {
             loadImageToCanvas(fileInput.files[0]);
         }
+    } else if (typeSelect.value === "stream") {
+        livestreamSettings.style.display = "block";
+    }
+
+    // Toggle drop zone and file requirement
+    if (typeSelect.value === "stream") {
+        dropZone.style.display = "none";
+        fileInput.required = false;
+        filePreview.style.display = "none";
+    } else {
+        if (!fileInput.files.length) {
+            dropZone.style.display = "flex";
+        }
+        fileInput.required = true;
     }
 
     // Toggle between Standard (COCO IDs) and Custom (Strings) Class Inputs
@@ -131,23 +154,82 @@ const POLYGON_COLORS = [
     { stroke: "#ff7675", fill: "rgba(255, 118, 117, 0.2)" }, // Red
 ];
 
+// --- FILE UPLOAD & FILTERING LOGIC ---
+
+["dragover", "dragleave", "drop"].forEach(name => {
+    dropZone.addEventListener(name, e => {
+        e.preventDefault();
+        if (name === "dragover") dropZone.classList.add("drop-zone--over");
+        else dropZone.classList.remove("drop-zone--over");
+    });
+});
+
+dropZone.addEventListener("drop", e => {
+    if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        handleFileChange(e.dataTransfer.files[0]);
+    }
+});
+
 fileInput.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) {
-        resetVideoCanvas();
-        resetImageCanvas();
-        return;
+    if (fileInput.files.length > 0) {
+        handleFileChange(fileInput.files[0]);
+    }
+});
+
+removeFileBtn.addEventListener("click", () => {
+    fileInput.value = "";
+    filePreview.style.display = "none";
+    dropZone.style.display = "flex";
+    imageGroup.disabled = false;
+    videoGroup.disabled = false;
+    resetVideoCanvas();
+    resetImageCanvas();
+    updateEstimation();
+});
+
+function handleFileChange(file) {
+    if (!file) return;
+
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+
+    // Update UI
+    previewName.textContent = `📄 Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+    filePreview.style.display = "block";
+    dropZone.style.display = "none";
+
+    // Filter Options
+    imageGroup.disabled = !isImage;
+    videoGroup.disabled = !isVideo;
+
+    // Disable individual options for better visual feedback (Safari/some browsers ignore group disable)
+    Array.from(imageGroup.options).forEach(opt => opt.disabled = !isImage);
+    Array.from(videoGroup.options).forEach(opt => opt.disabled = !isVideo);
+
+    // Auto-switch if current is invalid
+    const currentIsImageMode = typeSelect.selectedOptions[0].parentElement.id === "imageGroup";
+    const currentIsVideoMode = typeSelect.selectedOptions[0].parentElement.id === "videoGroup";
+
+    if (isImage && !currentIsImageMode) {
+        typeSelect.value = "basic";
+    } else if (isVideo && !currentIsVideoMode) {
+        typeSelect.value = "video";
     }
 
-    if (typeSelect.value === "polygon_cross_count" && file.type.startsWith("video/")) {
+    typeSelect.dispatchEvent(new Event('change'));
+    updateEstimation(); // Trigger estimation update
+
+    // Loading Previews
+    if (typeSelect.value === "polygon_cross_count" && isVideo) {
         loadVideoFrame(file);
-    } else if (typeSelect.value === "image_zone_count" && file.type.startsWith("image/")) {
+    } else if (typeSelect.value === "image_zone_count" && isImage) {
         loadImageToCanvas(file);
     } else {
         resetVideoCanvas();
         resetImageCanvas();
     }
-});
+}
 
 function loadVideoFrame(file) {
     const video = document.createElement("video");
@@ -514,6 +596,20 @@ form.addEventListener("submit", async (e) => {
                 formData.append("classes", JSON.stringify(classes));
             }
         }
+    } else if (typeSelect.value === "stream") {
+        // Stream mode uses standard classes (integers)
+        if (classInput) {
+            const classes = classInput
+                .split(",")
+                .map(v => v.trim())
+                .filter(v => v !== "")
+                .map(v => Number(v))
+                .filter(v => Number.isInteger(v) && v >= 0);
+
+            if (classes.length > 0) {
+                formData.append("classes", JSON.stringify(classes));
+            }
+        }
     } else {
         // user string parsing (Custom Modes)
         // pass the raw string from the custom input, backend handles list conversion
@@ -549,6 +645,15 @@ form.addEventListener("submit", async (e) => {
         formData.append("region_points", form.img_zone_points.value);
     }
 
+    // Add stream settings
+    if (typeSelect.value === "stream") {
+        formData.append("youtube_url", form.youtube_url.value);
+        formData.append("duration", form.duration.value);
+        formData.append("frame_skip", form.frame_skip.value);
+        // Clear file from formData if present (though we shouldn't have one selected)
+        formData.delete("file");
+    }
+
     let endpoint = "/basic-count";
     switch (typeSelect.value) {
         case "basic": endpoint = "/basic-count"; break;
@@ -559,6 +664,7 @@ form.addEventListener("submit", async (e) => {
         case "image_zone_count": endpoint = "/image-zone-count"; break;
         case "image_custom": endpoint = "/image-custom-count"; break;
         case "video_custom": endpoint = "/video-custom-count"; break;
+        case "stream": endpoint = "/stream-count"; break;
     }
 
     resultsEl.textContent = "Processing your file...";
@@ -658,6 +764,12 @@ function displayResults(data) {
         imgEl.style.display = "none";
     }
 
+    // Set download filename
+    const originalFile = fileInput.files[0];
+    const originalName = originalFile ? originalFile.name.split('.').slice(0, -1).join('.') : "result";
+    const extension = data.file_type === "video" ? "mp4" : "png";
+    downloadBtn.download = `${originalName}_processed.${extension}`;
+
     // Show download button
     downloadBtn.href = data.annotated_file;
     downloadBtn.style.display = "inline-block";
@@ -665,6 +777,21 @@ function displayResults(data) {
     // Scroll to results
     resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
+
+// Result copying logic
+document.getElementById("copyResultsBtn").addEventListener("click", () => {
+    const text = resultsEl.textContent;
+    if (!text || text === "Processing..." || text.includes("No objects detected")) return;
+
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById("copyResultsBtn");
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "✅ Copied!";
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+        }, 2000);
+    });
+});
 
 // --- ESTIMATION LOGIC ---
 const estimationSection = document.getElementById("estimationSection");
@@ -695,7 +822,7 @@ typeSelect.addEventListener("change", updateEstimation);
 
 async function updateEstimation() {
     const file = fileInput.files[0];
-    if (!file) {
+    if (!file || typeSelect.value === "stream") {
         estimationSection.style.display = "none";
         return;
     }
