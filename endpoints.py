@@ -330,9 +330,15 @@ async def get_result_file(filename: str):
     if not file_path.exists():
         return JSONResponse({"error": "File not found"}, status_code=404)
     
+    media_type = "image/png"
+    if filename.endswith(".mp4"):
+        media_type = "video/mp4"
+    elif filename.endswith(".jpg") or filename.endswith(".jpeg"):
+        media_type = "image/jpeg"
+    
     return FileResponse(
         path=str(file_path),
-        media_type="video/mp4" if filename.endswith(".mp4") else "image/png",
+        media_type=media_type,
         filename=filename
     )
 
@@ -410,7 +416,7 @@ async def api_video_custom_count(
 @router.post("/stream-count")
 async def api_stream_count(
     request: Request,
-    youtube_url: str = Form(...),
+    stream_url: str = Form(...),
     model: Optional[str] = Form("yolo11n.pt"),
     conf_threshold: Optional[float] = Form(0.35),
     duration: Optional[int] = Form(30), # Seconds to observe
@@ -436,7 +442,7 @@ async def api_stream_count(
     }
 
     # Create job with the URL as the filename/source
-    job_id = create_job("stream", youtube_url, config)
+    job_id = create_job("stream", stream_url, config)
     request.app.state.queue.put(job_id)
 
     return JSONResponse({"job_id": job_id, "status": "queued"})
@@ -450,6 +456,7 @@ async def get_job_status(job_id: str):
         
     response = {
         "id": job["id"],
+        "type": job["type"],
         "status": job["status"],
         "created_at": job["created_at"],
         "error": job["error"]
