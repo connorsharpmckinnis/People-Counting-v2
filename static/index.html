@@ -62,7 +62,7 @@
                         <option value="sliced_video">Sliced Video (Better for small objects)</option>
                         <option value="polygon_cross_count">Polygon Crossing</option>
                         <option value="video_custom">Advanced Video (Custom Classes)</option>
-                        <option value="stream">YouTube Livestream (Real-time)</option>
+                        <option value="stream">Live Stream (YouTube or Direct URL)</option>
                     </optgroup>
                 </select>
             </div>
@@ -345,15 +345,42 @@
             <!-- Livestream Settings -->
             <div id="livestreamSettings" class="advanced-settings" style="display:none;">
                 <h3>Livestream Settings</h3>
-                <p class="settings-description">Process a live YouTube stream for a set duration</p>
+                <p class="settings-description">Process a live video stream (YouTube or Axis camera for now) for a set
+                    duration</p>
 
                 <div class="form-group">
                     <label for="streamUrl">
-                        YouTube URL
-                        <span class="tooltip" data-tooltip="The full URL to the YouTube livestream.">ℹ️</span>
+                        Stream URL
+                        <span class="tooltip"
+                            data-tooltip="The full URL to the YouTube livestream or a direct camera stream (e.g. Axis camera).">ℹ️</span>
                     </label>
-                    <input type="text" name="youtube_url" id="streamUrl"
-                        placeholder="https://www.youtube.com/watch?v=..." class="form-control">
+                    <input type="text" name="stream_url" id="streamUrl"
+                        placeholder="https://www.youtube.com/watch?v=... OR http://user:pass@ip/stream"
+                        class="form-control">
+                </div>
+
+                <div id="axisHelper"
+                    style="background: rgba(0,0,0,0.05); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0; margin-bottom: 10px;">Camera Stream Helper</h4>
+                    <p style="font-size: 0.85rem; color: #666; margin-bottom: 10px;">Fill these to automatically build
+                        the Axis URL above.</p>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <div class="form-group" style="flex: 1; min-width: 150px; margin-bottom: 0;">
+                            <label style="font-size: 0.8rem;">IP Address</label>
+                            <input type="text" id="cameraIp" placeholder="192.168.1.50"
+                                style="padding: 5px; font-size: 0.9rem; width: 100%;">
+                        </div>
+                        <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
+                            <label style="font-size: 0.8rem;">Username</label>
+                            <input type="text" id="cameraUser" placeholder="admin"
+                                style="padding: 5px; font-size: 0.9rem; width: 100%;">
+                        </div>
+                        <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
+                            <label style="font-size: 0.8rem;">Password</label>
+                            <input type="password" id="cameraPass" placeholder="password"
+                                style="padding: 5px; font-size: 0.9rem; width: 100%;">
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group">

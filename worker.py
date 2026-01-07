@@ -59,7 +59,10 @@ def worker_loop(queue: multiprocessing.Queue):
             
             # Run the actual processing
             print(f"Running {job_type} on {filename}...")
-            counts, annotated_path = handler(filename, config=config)
+            if job_type == "stream":
+                counts, annotated_path = handler(filename, config=config, job_id=job_id)
+            else:
+                counts, annotated_path = handler(filename, config=config)
             
             # Move result to final location if needed?
             # The functions currently return a path.

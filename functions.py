@@ -5,7 +5,6 @@ from collections import Counter
 from ultralytics import YOLO, solutions, YOLOWorld, YOLOE
 from ultralytics.trackers.byte_tracker import BYTETracker
 from collections import defaultdict
-from ultralytics.models.sam import SAM3SemanticPredictor
 import cv2
 import numpy as np
 import supervision as sv
@@ -22,6 +21,9 @@ import yt_dlp
 # Directory to store model weight files (.pt)
 MODEL_DIR = os.path.join(os.getcwd(), "models")
 os.makedirs(MODEL_DIR, exist_ok=True)
+
+RESULTS_DIR = Path("results")
+RESULTS_DIR.mkdir(exist_ok=True)
 
 def get_model_path(model_name: str) -> str:
     """
@@ -1015,35 +1017,44 @@ def video_custom_classes(video_path: str, config: dict) -> tuple[dict, str]:
     count_dict = {cls: len(ids) for cls, ids in seen_ids.items()}
     return count_dict, final_path
 
-def stream_count(youtube_url: str, config: dict) -> tuple[dict, str]:
+def stream_count(stream_source: str, config: dict, job_id: str = None) -> tuple[dict, str]:
     """
-    Counts detected objects on a YouTube livestream and displays/saves the annotated stream.
+    Counts detected objects on a video stream (YouTube or direct URL) and displays/saves the annotated stream.
     
     Args:
-        youtube_url (str): The URL of the YouTube livestream.
+        stream_source (str): The URL of the YouTube livestream or a direct stream URL (e.g., MJPEG, RTSP, Axis).
         config (dict): Configuration dictionary.
             - duration: Max seconds to process (optional).
             - show_window: Whether to show the OpenCV window (default: False).
             - frame_skip: Sample every N frames (default: 5).
+        job_id (str): Optional job ID for saving preview frames.
         
     Returns:
-        tuple[dict, str]: (Unique counts, Path to the last annotated frame)
+        tuple[dict, str]: (Unique counts, Path to the annotated video)
     """
 
-    # 1. Get stream URL using yt-dlp
-    print(f"Fetching stream URL for: {youtube_url}")
-    ydl_opts = {
-        'format': 'best',
-        'quiet': True,
-        'no_warnings': True,
-    }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(youtube_url, download=False)
-            stream_url = info['url']
-    except Exception as e:
-        print(f"Error fetching stream URL: {e}")
-        return {}, ""
+    # 1. Get stream URL
+    # If it's a YouTube URL, use yt-dlp to get the actual stream URL.
+    # Otherwise, assume it's a direct stream URL (e.g. Axis camera).
+    is_youtube = "youtube.com" in stream_source or "youtu.be" in stream_source
+    
+    if is_youtube:
+        print(f"Fetching YouTube stream URL for: {stream_source}")
+        ydl_opts = {
+            'format': 'best',
+            'quiet': True,
+            'no_warnings': True,
+        }
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(stream_source, download=False)
+                stream_url = info['url']
+        except Exception as e:
+            print(f"Error fetching YouTube stream URL: {e}")
+            return {}, ""
+    else:
+        print(f"Using direct stream URL: {stream_source}")
+        stream_url = stream_source
 
     # 2. Setup Parameters & Model
     model_name = config.get("model", "yolo11n.pt")
@@ -1082,15 +1093,28 @@ def stream_count(youtube_url: str, config: dict) -> tuple[dict, str]:
         print("Error: Could not open video stream.")
         return {}, ""
     
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     frame_time = 1.0 / fps
     start_wall_time = time.perf_counter()
+
+    # Prepare Video Writer
+    temp_video_path = f"stream_{job_id or int(time.time())}.mp4"
+    writer = cv2.VideoWriter(
+        temp_video_path,
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        fps / frame_skip, # Saving only processed frames to keep it compact? Or all?
+        # User wants "whole annotated video", let's save what we process.
+        (w, h),
+    )
     
     print(f"Stream processing started (sampling every {frame_skip} frames). Show UI: {show_window}")
 
     last_process_time = 0
     last_detections = None
     last_labels = None
+    processed_count = 0
 
     try:
         while True:
@@ -1101,10 +1125,12 @@ def stream_count(youtube_url: str, config: dict) -> tuple[dict, str]:
                 print(f"Duration limit of {duration}s reached.")
                 break
 
+            found_frame = False
             for i in range(frame_skip):
                 ret, frame = cap.read()
                 if not ret:
                     break
+                found_frame = True
                 
                 is_process_frame = (i == frame_skip - 1)
 
@@ -1136,38 +1162,39 @@ def stream_count(youtube_url: str, config: dict) -> tuple[dict, str]:
                                 last_detections = det
                                 last_labels = labels
 
-                # Annotate
-                if last_detections is not None:
-                    frame = box_annotator.annotate(scene=frame, detections=last_detections)
-                    frame = label_annotator.annotate(scene=frame, detections=last_detections, labels=last_labels)
+                    # Annotate
+                    if last_detections is not None:
+                        frame = box_annotator.annotate(scene=frame, detections=last_detections)
+                        frame = label_annotator.annotate(scene=frame, detections=last_detections, labels=last_labels)
 
-                # Overlays
-                y_offset = 30
-                info_text = f"FPS: {fps:.1f} | Process: {last_process_time:.3f}s | Skip: {frame_skip}"
-                cv2.putText(frame, info_text, (20, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-                
-                y_offset += 30
-                for cls_name, ids in seen_ids.items():
-                    cv2.putText(frame, f"Total {cls_name}: {len(ids)}", (20, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                    # Overlays
+                    y_offset = 30
+                    info_text = f"FPS: {fps:.1f} | Process: {last_process_time:.3f}s | Skip: {frame_skip}"
+                    cv2.putText(frame, info_text, (20, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                    
                     y_offset += 30
+                    for cls_name, ids in seen_ids.items():
+                        cv2.putText(frame, f"Total {cls_name}: {len(ids)}", (20, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        y_offset += 30
 
-                last_annotated_frame = frame
+                    last_annotated_frame = frame
+                    writer.write(frame)
+                    processed_count += 1
 
-                # Display if requested
-                if show_window:
-                    cv2.imshow("YouTube Livestream Detection", frame)
-                    
-                    # Manual pacing to match real-time
-                    expected_elapsed = (i + 1) * frame_time
-                    actual_elapsed = time.perf_counter() - cycle_start
-                    wait_time = max(1, int((expected_elapsed - actual_elapsed) * 1000))
-                    
-                    if cv2.waitKey(wait_time) & 0xFF == ord('q'):
-                        print("\nStream stopped by user.")
-                        raise KeyboardInterrupt # Break both loops
-                else:
-                    # In headless mode, we don't need to wait between frames unless processing is too fast
-                    pass
+                    # Save preview for frontend every processed frame for smooth "watching"
+                    if job_id:
+                        preview_path = Path("results") / f"{job_id}_preview.jpg"
+                        cv2.imwrite(str(preview_path), frame)
+
+                    # Display if requested
+                    if show_window:
+                        cv2.imshow("YouTube Livestream Detection", frame)
+                        if cv2.waitKey(1) & 0xFF == ord('q'):
+                            print("\nStream stopped by user.")
+                            raise KeyboardInterrupt
+            
+            if not found_frame:
+                break
 
     except (KeyboardInterrupt, Exception) as e:
         if not isinstance(e, KeyboardInterrupt):
@@ -1176,16 +1203,33 @@ def stream_count(youtube_url: str, config: dict) -> tuple[dict, str]:
             traceback.print_exc()
     finally:
         cap.release()
+        writer.release()
         if show_window:
             cv2.destroyAllWindows()
 
-    # Save final snapshot
-    snapshot_path = "stream_snapshot.jpg"
-    if last_annotated_frame is not None:
-        cv2.imwrite(snapshot_path, last_annotated_frame)
+    # Small delay for Windows
+    time.sleep(0.5)
+
+    # Convert to H.264
+    base, ext = os.path.splitext(temp_video_path)
+    h264_path = f"{base}_h264.mp4"
+    if convert_to_h264(temp_video_path, h264_path):
+        os.remove(temp_video_path)
+        final_path = h264_path
+    else:
+        final_path = temp_video_path
     
+    # Cleanup preview
+    if job_id:
+        preview_path = Path("results") / f"{job_id}_preview.jpg"
+        if preview_path.exists():
+            try:
+                os.remove(preview_path)
+            except:
+                pass
+
     final_counts = {cls: len(ids) for cls, ids in seen_ids.items()}
-    return final_counts, snapshot_path
+    return final_counts, final_path
 
 
 def test():
@@ -1201,7 +1245,7 @@ def test():
         slice_width=256,
         overlap_height_ratio=0.2,
         overlap_width_ratio=0.2,
-        frame_skip=5,
+        frame_skip=2,
         #region_points=[(100, 100), (100, 500), (500, 500), (500, 100)],
     )
     

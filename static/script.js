@@ -129,6 +129,26 @@ const canvasPlaceholder = document.getElementById("canvasPlaceholder");
 const regionPointsInput = document.getElementById("regionPoints");
 const clearPointsBtn = document.getElementById("clearPointsBtn");
 const pointCountSpan = document.getElementById("pointCount");
+const streamUrlInput = document.getElementById("streamUrl");
+const cameraIp = document.getElementById("cameraIp");
+const cameraUser = document.getElementById("cameraUser");
+const cameraPass = document.getElementById("cameraPass");
+
+// Auto-assemble stream URL from helper fields
+[cameraIp, cameraUser, cameraPass].forEach(el => {
+    el.addEventListener("input", () => {
+        const ip = cameraIp.value.trim();
+        const user = cameraUser.value.trim();
+        const pass = cameraPass.value.trim();
+
+        if (ip || user || pass) {
+            // Format: http://username:password@ip_address/axis-cgi/media.cgi?container=mp4&video=1&audio=0&videocodec=h264
+            // We use the full path from the user's initial request to ensure it works for Axis.
+            const url = `http://${user}:${pass}@${ip}/axis-cgi/media.cgi?container=mp4&video=1&audio=0&videocodec=h264`;
+            streamUrlInput.value = url;
+        }
+    });
+});
 
 // Multi-polygon data structure: array of arrays
 let videoPolygons = [];       // Array of completed polygons
@@ -647,7 +667,7 @@ form.addEventListener("submit", async (e) => {
 
     // Add stream settings
     if (typeSelect.value === "stream") {
-        formData.append("youtube_url", form.youtube_url.value);
+        formData.append("stream_url", form.stream_url.value);
         formData.append("duration", form.duration.value);
         formData.append("frame_skip", form.frame_skip.value);
         // Clear file from formData if present (though we shouldn't have one selected)
@@ -729,10 +749,16 @@ async function pollJobStatus(jobId) {
             } else if (job.status === "processing") {
                 resultsEl.textContent = "⚙️ Processing... This may take a moment.";
                 resultsEl.style.color = "#e17055";
+
+                // Show preview for stream jobs
+                if (job.type === "stream") {
+                    showStreamPreview(jobId);
+                }
             }
 
-            // Poll again in 2 seconds
-            setTimeout(() => pollJobStatus(jobId), 2000);
+            // Poll faster for stream jobs to feel "live"
+            const pollInterval = job.type === "stream" ? 500 : 2000;
+            setTimeout(() => pollJobStatus(jobId), pollInterval);
         }
 
     } catch (e) {
@@ -740,6 +766,18 @@ async function pollJobStatus(jobId) {
         resultsEl.textContent = "Error checking job status.";
         resetBtnState();
     }
+}
+
+function showStreamPreview(jobId) {
+    const previewUrl = `/get-result/${jobId}_preview.jpg?t=${Date.now()}`;
+
+    const tempImg = new Image();
+    tempImg.onload = () => {
+        imgEl.src = previewUrl;
+        imgEl.style.display = "block";
+        videoEl.style.display = "none";
+    };
+    tempImg.src = previewUrl;
 }
 
 function displayResults(data) {
