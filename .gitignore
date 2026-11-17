@@ -13,6 +13,9 @@ wheels/
 # Virtual environments
 .venv
 
+# Jobs
+data/*
+*.db
 
 # Videos and Photos
 results/
@@ -22,8 +25,10 @@ uploads/
 *.png
 *.mov
 *.avi
+*.jpeg
 
 
 # Large models
+models/*
 yolo11x.pt
 mobileclip_blt.ts

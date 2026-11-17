@@ -1,5 +1,7 @@
 # Detection Engine v2
 
+## Status: Archived prototype/proof-of-concept
+
 A robust, secure object detection and counting system built with YOLO11, SAHI (Slicing Aided Hyper Inference), and FastAPI. This tool provides a modern web UI and secure API endpoints for detecting, tracking, and counting objects in images and videos.
 
 **Latest Docker Image:** `connorsharpmckinnis/detection-engine:0.9`

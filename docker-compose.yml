@@ -12,7 +12,7 @@ services:
     # Environment variables
     # You can also use an .env file alongside this compose file
     environment:
-      - APP_PASSWORD=REMOVED
+      - APP_PASSWORD=set-a-password-here
       - NUM_WORKERS=3
     
     # Persist data across container restarts
